@@ -1,4 +1,4 @@
-# Automatiza una pastelería con n8n: del encargo al cierre de caja
+# Sesión 1 · Avisos al cliente y cierre de caja
 
 Clase práctica para aprender, paso a paso, a automatizar un negocio pequeño con n8n: desde encender n8n con Docker hasta tener flujos reales funcionando, con un agente de IA ayudando.
 
@@ -6,36 +6,139 @@ Clase práctica para aprender, paso a paso, a automatizar un negocio pequeño co
 
 ---
 
-## 0. Qué vamos a construir
+## Paso 1 — Levantar n8n (y la pastelería) en local con Docker (15 min)
 
-**Pastelería La Cuchara** vende tartas por encargo. El cliente deja una **señal de al menos 10 €**, paga el resto antes de la entrega (máximo 30 días) y recoge su tarta. Hoy Marisa, la dueña, apunta todo a mano y revisa los avisos del banco para saber quién ha pagado.
+**La idea en simple.** Un **contenedor** de Docker es una cocina portátil ya montada: trae dentro el programa con todo lo que necesita, así que **no instalas n8n ni Python en tu ordenador**. Lo enciendes, lo usas y, si lo apagas, tu ordenador queda como estaba.
+
+### 1.1 Comprueba que Docker funciona
 
 Ya tiene una **app** (carpetas `backend/` y `frontend/`) que guarda los encargos y los pagos. Nosotros no la tocamos: construimos con n8n **todo lo que pasa alrededor**.
 
-```
-                  La app avisa a n8n cuando pasa algo
- App (8000)  ───────────────────────────────────────────▶  n8n (5678)
- encargos y pagos                                           │
-     ▲                                                      ├─ ① Flujo 01: confirma el encargo y manda recibos
-     │                                                      ├─ ② Flujo 02: cada noche, el cierre de caja
-     │   n8n consulta y registra pagos con la API           ├─ ③ Flujo 03: lee los correos del banco con IA
-     └──────────────────────────────────────────────────────┤        y registra el pago en el encargo
-                                                            └─ ④ Flujo 00: si algo falla, avisa a Marisa
-
-                         Todos los correos salen a Mailpit (8025), un buzón de pruebas
+```bash
+docker --version
+docker compose version
+docker ps
 ```
 
-### La idea en una frase
+Los dos primeros muestran una versión y el tercero una tabla (vacía si no tienes nada en marcha). Si sale `Cannot connect to the Docker daemon`, Docker Desktop no está abierto del todo.
 
-> **n8n es un empleado que sigue recetas.** Cada **flujo** (workflow) es una receta: tiene algo que la **activa** (el timbre de la tienda o el reloj de la cocina), unos **pasos** (nodos) y un **resultado**. Lo que pasa de un paso al siguiente son los **ingredientes** (los datos, que n8n llama *items*).
+### 1.2 n8n solo, con un único comando (3 min)
 
-| En n8n | En simple | En la pastelería |
+Para ver lo mínimo que hace falta, arranca n8n a pelo:
+
+```bash
+docker run -it --rm --name n8n -p 5678:5678 -v n8n_data:/home/node/.n8n docker.n8n.io/n8nio/n8n
+```
+
+| Parte del comando | En simple |
+|---|---|
+| `docker run` | Enciende un contenedor |
+| `-it --rm` | Te deja ver lo que pasa dentro, y lo borra al apagarlo |
+| `--name n8n` | Le pone nombre |
+| `-p 5678:5678` | Abre la puerta: lo que haya en el puerto 5678 del contenedor se ve en `http://localhost:5678` |
+| `-v n8n_data:/home/node/.n8n` | Una **caja de guardado** (volumen): tus flujos y credenciales viven ahí y sobreviven al apagarlo |
+| `docker.n8n.io/n8nio/n8n` | La imagen: la receta de la cocina portátil. La primera vez la descarga |
+
+Cuando el texto diga `Editor is now accessible via: http://localhost:5678`, abre esa dirección: ya tienes n8n. **Páralo con `Ctrl + C`** antes de seguir: lo vamos a encender de otra forma y los dos usarían el mismo puerto.
+
+### 1.3 Todo junto con `docker compose`
+
+Nosotros necesitamos **tres piezas** a la vez (la app de la pastelería, n8n y el buzón Mailpit), así que en vez de tres comandos usamos un archivo, `docker-compose.yml`, que las describe y las enciende juntas:
+
+```bash
+cd clase-n8n-pasteleria
+cp .env.example .env
+docker compose up -d
+```
+
+La primera vez construye la app y descarga las imágenes (unos minutos). `-d` lo deja funcionando **en segundo plano**.
+
+| Servicio | URL | Para qué |
 |---|---|---|
-| Flujo (*workflow*) | Una receta | "Cuando haya un encargo nuevo, avisa al cliente" |
-| Disparador (*trigger*) | Lo que pone la receta en marcha | El timbre (un aviso de la app) o el reloj (las 21:00) |
-| Nodo | Un paso de la receta | "Enviar correo", "Sumar importes" |
-| Item | Un ingrediente que pasa de paso en paso | Un encargo, un pago |
-| Credencial | La llave guardada para usar un servicio | La clave de la app o el acceso al correo |
+| App de la pastelería | http://localhost:8000 | La pantalla de Marisa: encargos, pagos y descarga en Excel |
+| API de la app | http://localhost:8000/docs | Lo que usará n8n, documentado en Swagger |
+| n8n | http://localhost:5678 | Donde construimos los flujos |
+| Mailpit | http://localhost:8025 | El buzón donde llegan todos los correos |
+
+### 1.4 Primera vez en n8n
+
+n8n te pide **crear una cuenta de propietario** (es local, solo para tu instancia). Pon lo que quieras. Después salen dos ventanas opcionales (un cuestionario y una oferta de licencia): cierra la primera con **Get started** sin responder y la segunda con **Skip**.
+
+![Crear la cuenta de propietario (los datos son de ejemplo)](imagenes/p1-01-n8n-cuenta-propietario.jpg)
+*Crear la cuenta de propietario (los datos son de ejemplo)*
+
+![El cuestionario opcional: pulsa Get started sin responder](imagenes/p1-02-n8n-cuestionario.jpg)
+*El cuestionario opcional: pulsa Get started sin responder*
+
+![Así se ve n8n recién estrenado](imagenes/p1-03-n8n-inicio.jpg)
+*Así se ve n8n recién estrenado*
+
+
+### 1.5 Comandos que vas a usar (guárdalos)
+
+| Quiero… | Comando |
+|---|---|
+| Ver qué está encendido | `docker compose ps` |
+| Ver lo que escribe n8n (para buscar errores) | `docker compose logs -f n8n` (sal con `Ctrl + C`) |
+| Apagar todo **sin perder nada** | `docker compose stop` (y `docker compose start` para volver) |
+| Apagar y quitar los contenedores | `docker compose down` (tus flujos se conservan) |
+| Empezar **de cero** | `docker compose down -v` ⚠️ borra los volúmenes: **tus flujos y credenciales desaparecen** |
+
+
+![La app de la pastelería en http://localhost:8000](imagenes/p1-04-app-encargos.jpg)
+*La app de la pastelería en http://localhost:8000*
+
+![Mailpit en http://localhost:8025, todavía sin correos](imagenes/p1-05-mailpit-vacio.jpg)
+*Mailpit en http://localhost:8025, todavía sin correos*
+
+**Checkpoint:** las cuatro URLs abren. `docker compose ps` muestra tres servicios `running`. En Mailpit todavía no hay ningún correo.
+
+---
+
+## Paso 2 — Conocer la app (15 min)
+
+La app es el **mostrador** de la pastelería: ahí se apuntan encargos y pagos. n8n no la sustituye, trabaja detrás.
+
+**La pantalla** — http://localhost:8000
+
+1. En **Encargos** verás los 8 de ejemplo, con lo **pagado** y lo **pendiente** de cada uno, y un aviso de color cuando la entrega está cerca. Prueba el buscador y las pestañas *Pendientes / Pagados / Todos*.
+2. Abre un encargo (por ejemplo el #3): ves lo pagado, una barra de progreso y la lista de pagos.
+3. En **Pagos** está el historial completo. **Descargar Excel** baja todos los datos en una hoja por tabla.
+4. Pulsa **Nuevo encargo**. Hay dos formas de equivocarse y cada una la avisa alguien distinto:
+   - Pon una señal de **5 €**: es el **propio navegador** quien avisa («Value must be greater than or equal to 10») y no deja enviar.
+   - Pon una fecha de entrega **dentro de más de 30 días** y una señal de 10 €: ahora la que lo rechaza es **la app**, y el formulario vuelve **sin perder lo que escribiste**.
+   Después créalo bien.
+
+   ![Ficha de un encargo: lo pagado, lo pendiente y el formulario para registrar un pago](imagenes/p2-01-encargo-ficha.jpg)
+   *Ficha de un encargo: lo pagado, lo pendiente y el formulario para registrar un pago*
+
+   ![La pantalla Pagos, con el historial completo](imagenes/p2-02-pagos.jpg)
+   *La pantalla Pagos, con el historial completo*
+
+   ![Con una señal de 5 € el navegador avisa antes de enviar](imagenes/p2-04-nuevo-encargo-aviso-navegador.jpg)
+   *Con una señal de 5 € el navegador avisa antes de enviar*
+
+   ![Con una entrega a más de 30 días la rechaza la app, y conserva lo escrito](imagenes/p2-05-nuevo-encargo-rechazado.jpg)
+   *Con una entrega a más de 30 días la rechaza la app, y conserva lo escrito*
+
+   ![Encargo creado correctamente](imagenes/p2-06-encargo-creado.jpg)
+   *Encargo creado correctamente*
+
+
+**Las reglas** que aplica la app (tú no las programas, las usas):
+
+| Regla | Detalle |
+|---|---|
+| Señal | Mínimo **10 €** al crear el encargo |
+| Entrega | Entre mañana y dentro de **30 días** |
+| Pagos | Se puede pagar en partes, pero **nunca más de lo que falta** |
+| Pagado | Cuando lo pendiente llega a 0 €, el encargo pasa a `pagado` |
+
+**La API** — http://localhost:8000/docs
+
+Es lo que usará n8n. Pulsa **Authorize** (arriba a la derecha) y escribe el valor de `API_KEY` de tu `.env` (`cambia-esta-clave`). Prueba `GET /api/encargos` (**Try it out → Execute**): los mismos encargos, pero como datos.
+
+La pantalla que acabas de usar **también pide sus datos a esta API**: es un cliente más, igual que lo será n8n. Por eso, en el repositorio, la interfaz está en `frontend/` y la lógica en `backend/` (en el README de `main` tienes el esquema).
 
 ### Los cuatro flujos que vas a construir
 
@@ -48,16 +151,43 @@ Ya tiene una **app** (carpetas `backend/` y `frontend/`) que guarda los encargos
 
 ---
 
-## 1. Cómo está organizada la clase
+## Paso 4 — Flujo 01: confirmar encargos y mandar recibos (40 min)
 
-Son **dos sesiones**, cada una en **su propia rama** de este repositorio. La rama trae la guía de esa sesión (en su `README.md`) y los archivos de referencia que necesita.
+**Objetivo:** cuando la app avise de un evento, enviar el correo adecuado al cliente.
 
 | Sesión | Rama | Pasos | Duración | Al terminar tienes funcionando |
 |---|---|---|---|---|
 | **1** | `sesion-1` | 1 a 5 | ~1 h 50 | Todo levantado y conectado, los **avisos al cliente** (flujo 01) y el **cierre de caja** (flujo 02) |
 | **2** | `sesion-2` | 6 a 9 | ~2 h | **Aviso de errores** (flujo 00), **pagos por correo con IA** (flujo 03), un flujo hecho con el agente y todo subido a tu repositorio |
 
-**Cómo empezar cada sesión:**
+![Flujo 01 completo: webhook, Switch, un IF y tres correos](imagenes/p4-01-flujo-01-lienzo.jpg)
+*Flujo 01 completo: webhook, Switch, un IF y tres correos*
+
+### 4.1 Crear el flujo y el disparador
+
+1. **Create workflow** (esquina superior). Ponle nombre arriba: `01 Eventos de la pastelería`.
+2. **Add first step** → busca **Webhook** y añádelo. Configúralo:
+
+| Campo | Valor |
+|---|---|
+| HTTP Method | `POST` |
+| Path | `pasteleria` |
+| Respond | `Immediately` |
+
+Renombra el nodo a `Evento de la pastelería` (clic en el nombre o `F2`).
+
+> **Dos URLs, una trampa.** El nodo muestra una **Test URL** (`/webhook-test/pasteleria`) y una **Production URL** (`/webhook/pasteleria`). La **Test URL** solo funciona unos segundos, cuando pulsas *Listen for test event* o *Execute workflow*. La **Production URL** solo funciona cuando el flujo está **publicado**. La app usa la de producción.
+
+![El nodo Webhook con la pestaña Test URL](imagenes/p4-02-webhook-test-url.jpg)
+*El nodo Webhook con la pestaña Test URL*
+
+![La misma pantalla con la pestaña Production URL: es la que usa la app](imagenes/p4-03-webhook-production-url.jpg)
+*La misma pantalla con la pestaña Production URL: es la que usa la app*
+
+
+### 4.2 Probar con un evento de mentira
+
+Para desarrollar sin tocar la app, simulamos el aviso con `curl`. En n8n, pulsa **Listen for test event** (o *Execute step*) en el nodo Webhook y **en los siguientes 2 minutos** ejecuta en tu terminal:
 
 ```bash
 git clone https://github.com/Factoria-F5-madrid/clase-n8n-pasteleria.git clase-n8n-pasteleria
@@ -65,26 +195,148 @@ cd clase-n8n-pasteleria
 git switch sesion-1          # y en la segunda sesión: git switch sesion-2
 ```
 
-Después abre el `README.md` de tu rama y sigue los pasos.
+El nodo se llena con el aviso. Fíjate en la pestaña **Output**: los datos están en `body.evento` y `body.datos`. **Anota esto: el JSON que envía la app está dentro de `body`.**
 
-**Tres cosas que conviene saber:**
 
-| Tema | Cómo funciona |
+![Tras pulsar «Listen for test event», n8n espera el aviso (tienes un par de minutos)](imagenes/p4-08-webhook-escuchando.jpg)
+*Tras pulsar «Listen for test event», n8n espera el aviso (tienes un par de minutos)*
+
+![Llega el aviso: los datos están dentro de `body` (cambia a la vista JSON arriba a la derecha)](imagenes/p4-09-webhook-salida-json.jpg)
+*Llega el aviso: los datos están dentro de `body` (cambia a la vista JSON arriba a la derecha)*
+
+### 4.3 Repartir según el evento (Switch)
+
+1. Añade un nodo **Switch** conectado al Webhook. Renómbralo `Según el evento`.
+2. **Mode:** `Rules`. Crea dos reglas:
+
+| Regla | Value 1 (expresión) | Operador | Value 2 | Renombrar salida a |
+|---|---|---|---|---|
+| 1 | `{{ $json.body.evento }}` | String → is equal to | `encargo.creado` | `encargo.creado` |
+| 2 | `{{ $json.body.evento }}` | String → is equal to | `pago.registrado` | `pago.registrado` |
+
+> Para escribir una **expresión**, en el campo pulsa *Expression* (o escribe `{{`). Todo lo que va entre `{{ }}` es JavaScript que n8n calcula para cada item.
+
+Pulsa **Execute step**: con el evento `encargo.creado` el item sale por la salida 1.
+
+
+![Las reglas del Switch (aquí la 1 desplegada)](imagenes/p4-04-switch-reglas.jpg)
+*Las reglas del Switch (aquí la 1 desplegada)*
+
+### 4.4 Correo de confirmación
+
+En la salida `encargo.creado` añade el nodo **Send Email** (el de *Send email*, con el sobre). Renómbralo `Confirmar encargo`:
+
+| Campo | Valor |
 |---|---|
-| **Tus flujos** | Viven dentro de n8n (en su volumen de Docker), **no en la rama**. Cambiar de rama no los toca. Lo que **sí** los borra es `docker compose down -v` |
-| **Tus exportaciones** | Guárdalas en la carpeta `mis-flujos/`. Es tuya: las ramas no la modifican |
-| **Si te atascas o faltaste a la sesión 1** | La carpeta `referencia/` de cada rama trae los flujos terminados para importarlos y seguir |
+| Credential | `Mailpit` |
+| From Email | `pasteleria@lacuchara.example` |
+| To Email | `{{ $json.body.datos.email }}` |
+| Subject | `Tu encargo #{{ $json.body.datos.id }} está confirmado` |
+| Email Format | `Text` |
+| Text | ver abajo |
 
----
+```
+Hola {{ $json.body.datos.cliente }},
 
-## 2. Antes de empezar
+Hemos apuntado tu encargo: {{ $json.body.datos.tarta }} para {{ $json.body.datos.raciones }} raciones.
 
-- [ ] **Docker Desktop** instalado y abierto (`docker --version`).
-- [ ] **Git** instalado (`git --version`).
-- [ ] Una cuenta gratuita en **[console.groq.com](https://console.groq.com)** y una **API key** creada (*API Keys → Create API Key*). Se usa en el Paso 3 (credencial) y se aprovecha en la sesión 2.
-- [ ] Un editor (VS Code) y, opcional, **OpenCode** para el Paso 8.
+Precio: {{ $json.body.datos.precio.toFixed(2) }} €
+Pagado: {{ $json.body.datos.pagado.toFixed(2) }} €
+Pendiente: {{ $json.body.datos.pendiente.toFixed(2) }} €
+Entrega: {{ $json.body.datos.fecha_entrega }}
 
-> **No necesitas** cuenta de Gmail, de Slack ni de Telegram. Los correos van a **Mailpit**, un buzón de pruebas que corre en tu ordenador y que te deja ver cada correo que manda n8n.
+Pastelería La Cuchara
+```
+
+En **Options** (*Add option*) desactiva **Append n8n Attribution** para que no añada la firma de n8n.
+
+Pulsa **Execute step** y abre **Mailpit** (http://localhost:8025): el correo debe estar allí.
+
+> **Los importes los da la app, nunca los calculamos nosotros.** `toFixed(2)` solo los muestra con dos decimales.
+
+
+![El nodo «Confirmar encargo»: credencial, remitente, destinatario, asunto y texto con expresiones](imagenes/p4-05-email-confirmar.jpg)
+*El nodo «Confirmar encargo»: credencial, remitente, destinatario, asunto y texto con expresiones*
+
+![Más abajo, la opción para quitar la firma de n8n (Append n8n Attribution apagada)](imagenes/p4-06-email-sin-firma.jpg)
+*Más abajo, la opción para quitar la firma de n8n (Append n8n Attribution apagada)*
+
+### 4.5 Recibo de pago o "ya está pagado" (IF)
+
+Conecta la salida `pago.registrado` del Switch a un nodo **IF** llamado `¿Queda pagado?`:
+
+| Campo | Valor |
+|---|---|
+| Value 1 | `{{ $json.body.datos.estado }}` |
+| Operador | String → is equal to |
+| Value 2 | `pagado` |
+
+Ahora **dos** nodos **Send Email** (credencial `Mailpit`, mismo remitente, `To` = `{{ $json.body.datos.email }}`):
+
+- Salida **true** → `Tarta lista para recoger`
+  - Subject: `Tu encargo #{{ $json.body.datos.id }} está pagado`
+  - Text: `Hola {{ $json.body.datos.cliente }}, hemos recibido {{ $json.body.datos.importe.toFixed(2) }} € y tu encargo ya está pagado por completo. Te esperamos el {{ $json.body.datos.fecha_entrega }} para recoger tu {{ $json.body.datos.tarta }}.`
+- Salida **false** → `Recibo de pago`
+  - Subject: `Recibo de tu pago del encargo #{{ $json.body.datos.id }}`
+  - Text: `Hola {{ $json.body.datos.cliente }}, hemos recibido {{ $json.body.datos.importe.toFixed(2) }} €. Te quedan por pagar {{ $json.body.datos.pendiente.toFixed(2) }} € antes de la entrega ({{ $json.body.datos.fecha_entrega }}).`
+
+Prueba el IF con dos `curl`, uno por cada rama. Para cada uno:
+
+1. Cierra el nodo y pulsa **Execute workflow** (abajo): n8n se queda esperando un aviso, igual que antes.
+2. Pega el comando en tu terminal y pulsa Enter.
+3. Mira el lienzo: el camino que ha seguido el aviso se pone en verde, y el correo llega a Mailpit.
+
+**Rama «pagado»** (ya no debe nada: sale por *true*, «Tarta lista para recoger»):
+
+```bash
+curl -X POST http://localhost:5678/webhook-test/pasteleria \
+  -H "Content-Type: application/json" \
+  -d '{"evento":"pago.registrado","datos":{"id":99,"cliente":"Ana Prueba","email":"ana@example.com","tarta":"Tarta de queso","raciones":8,"precio":32,"pagado":32,"pendiente":0,"estado":"pagado","fecha_entrega":"2026-12-01","importe":10}}'
+```
+
+**Rama «pendiente»** (todavía debe algo: sale por *false*, «Recibo de pago»). Vuelve a pulsar **Execute workflow** antes de pegarlo:
+
+```bash
+curl -X POST http://localhost:5678/webhook-test/pasteleria \
+  -H "Content-Type: application/json" \
+  -d '{"evento":"pago.registrado","datos":{"id":99,"cliente":"Ana Prueba","email":"ana@example.com","tarta":"Tarta de queso","raciones":8,"precio":32,"pagado":10,"pendiente":22,"estado":"pendiente","fecha_entrega":"2026-12-01","importe":10}}'
+```
+
+La única diferencia entre los dos son `pagado`, `pendiente` y `estado`. El IF solo mira `estado`.
+
+
+![El IF «¿Queda pagado?»: estado igual a `pagado`](imagenes/p4-07-if-pagado.jpg)
+*El IF «¿Queda pagado?»: estado igual a `pagado`*
+
+### 4.6 Publicar y probar con la app de verdad
+
+1. Pulsa **Publish** (arriba a la derecha). Se abre una ventana que pide un **nombre de versión** (ya viene uno puesto): pulsa **Publish** otra vez. Después sale un aviso de «Workflow published»: pulsa **Got it**. Un flujo publicado escucha la **Production URL** sin que tengas que pulsar nada.
+
+   ![La ventana de Publish: deja el nombre de versión y confirma](imagenes/p4-10-publicar-dialogo.jpg)
+   *La ventana de Publish: deja el nombre de versión y confirma*
+
+   ![Aviso de flujo publicado](imagenes/p4-11-publicado.jpg)
+   *Aviso de flujo publicado*
+
+2. En la app (http://localhost:8000) pulsa **Nuevo encargo**. Pon tu nombre, un correo inventado (`tu@correo.example`), una tarta de 30 €, una fecha de entrega entre mañana y dentro de 30 días y una señal de 10 €.
+3. En la app, abre **Avisos a n8n**: el aviso nuevo dice **«Enviado. n8n respondió 200»** (antes decía 404). En Mailpit llega **«Tu encargo #9 está confirmado»**.
+4. En la ficha del encargo, **Registrar pago** de 10 €: llega el **recibo**. Registra otros 10 €: ahora faltan 10 € todavía. Registra los últimos 10 €: el encargo queda pagado y llega **«Tu encargo está pagado»**.
+5. Mira la pestaña **Executions** del flujo: cada aviso es una ejecución, con sus datos. (Las ejecuciones de un flujo publicado **no aparecen en el lienzo** al momento: se ven aquí.)
+
+   ![Las ejecuciones del flujo: la última muestra el camino que siguió el aviso](imagenes/p4-12-ejecuciones.jpg)
+   *Las ejecuciones del flujo: la última muestra el camino que siguió el aviso*
+
+   ![Mailpit con los tres correos al cliente](imagenes/p4-13-mailpit-tres-correos.jpg)
+   *Mailpit con los tres correos al cliente*
+
+   ![El correo de confirmación, con los importes que dio la app](imagenes/p4-14-correo-confirmacion.jpg)
+   *El correo de confirmación, con los importes que dio la app*
+
+   ![Avisos a n8n: el primero decía 404, los nuevos dicen «Enviado. n8n respondió 200»](imagenes/p4-15-avisos-200.jpg)
+   *Avisos a n8n: el primero decía 404, los nuevos dicen «Enviado. n8n respondió 200»*
+
+
+**Checkpoint:** tres correos distintos en Mailpit y tres ejecuciones verdes. Con este flujo, cada encargo y cada pago avisan al cliente solos.
 
 ---
 
@@ -116,6 +368,10 @@ Por eso la carpeta se llama `frontend/` y no `templates/`: no son plantillas que
 
 ## Estructura de este repositorio
 
+**Objetivo:** cada noche, sumar lo cobrado en el día por forma de pago y mandárselo a Marisa. Este flujo **no lo activa un aviso de la app**, sino el **reloj**.
+
+```
+ Cada noche 21:00 ──▶ HTTP: pagos de hoy ──▶ Code: sumar por forma de pago ──▶ Correo a Marisa
 ```
 clase-n8n-pasteleria/
 ├── README.md              ← esta página (vista general)
@@ -137,3 +393,67 @@ clase-n8n-pasteleria/
 ├── (sesion-1) referencia/ ← flujos 01 y 02 terminados
 └── (sesion-2) referencia/ ← flujos 00, 01, 02 y 03 terminados
 ```
+Hola Marisa,
+
+Hoy se han cobrado {{ $json.total }} € ({{ $json.n }} pagos):
+
+{{ $json.resumen }}
+```
+
+![El nodo «Enviar cierre a Marisa»](imagenes/p5-07-email-cierre-nodo.jpg)
+*El nodo «Enviar cierre a Marisa»*
+
+7. **Execute workflow** (no hace falta esperar a las 21:00). El correo aparece en Mailpit con el total y el reparto.
+
+   ![Tras Execute workflow: los 3 pagos de hoy (3 items) se convierten en 1 resumen](imagenes/p5-08-ejecucion-cierre.jpg)
+   *Tras Execute workflow: los 3 pagos de hoy (3 items) se convierten en 1 resumen*
+
+   ![El correo de cierre de caja en Mailpit](imagenes/p5-09-correo-cierre.jpg)
+   *El correo de cierre de caja en Mailpit*
+
+8. **Comprueba que el total cuadra** con la app: en la pantalla **Pagos** (http://localhost:8000/pagos) suma a mano los de hoy.
+9. Pulsa **Publish** (confirma la ventana igual que en el flujo 01) para que se ejecute cada noche.
+
+**Checkpoint:** correo de cierre con importes que coinciden con la app. Marisa ya no tiene que sumar a mano.
+
+---
+
+## Cierre de la sesión 1 (10 min)
+
+1. **Exporta tus dos flujos.** En cada uno: menú `···` → **Download** → guárdalo en `mis-flujos/` como `01-eventos.json` y `02-cierre.json`. Así tienes copia aunque borres n8n.
+2. **Comprueba el checklist:**
+
+| | |
+|---|---|
+| Las 4 URLs abren y los tres contenedores están en marcha | ☐ |
+| Un encargo creado en la app genera el correo de confirmación en Mailpit | ☐ |
+| Un pago genera el recibo, y el último pago genera «ya está pagado» | ☐ |
+| El flujo 02 manda un cierre con importes que coinciden con la app | ☐ |
+| Los flujos 01 y 02 están **publicados** | ☐ |
+
+3. **Para la sesión 2:**
+   - Ten lista tu **API key de Groq**.
+   - **No ejecutes `docker compose down -v`**: borraría tus flujos y tus credenciales. Para apagar todo sin perder nada, `docker compose down` (sin `-v`) o `docker compose stop`.
+   - Cuando empiece la sesión 2: `git switch sesion-2`.
+
+---
+
+## Errores típicos de esta sesión
+
+| Síntoma | Causa | Solución |
+|---|---|---|
+| `port is already allocated` al hacer `docker compose up` | Otro programa (u otro n8n) ya usa el puerto 5678, 8000 u 8025 | Ciérralo, o cambia el número de la **izquierda** en `docker-compose.yml` (por ejemplo `5679:5678`) |
+| La app crea el encargo pero no llega ningún correo | El flujo 01 no está **publicado** (la app usa la Production URL) | Mira **Avisos a n8n** en la app: si dice 404, pulsa **Publish** en el flujo |
+| `The requested webhook ... is not registered` | Igual que el anterior, o has usado `/webhook-test/` fuera de *Listen for test event* | Publicar, o pulsar *Listen for test event* antes del `curl` |
+| `ECONNREFUSED 127.0.0.1` o `localhost` no responde (SMTP o API) | Estás usando `localhost` dentro de n8n | Usa `mailpit` y `http://pasteleria:8000` |
+| `401 Unauthorized` al llamar a la app | La credencial `API Pastelería` no tiene la clave de tu `.env` | Revisa Name `X-API-Key` y el valor |
+| `No recipients defined` o `Cannot read properties of undefined` | La expresión no encuentra el dato. En el webhook los datos están en `body.datos`, no en `datos` | Usa `$json.body.datos...` en el flujo del webhook |
+| El flujo se para y no llega el cierre cuando no hay pagos | Falta **Always Output Data** en el HTTP Request | Actívalo en Settings del nodo |
+| `$now.format is not a function` | Dentro de un nodo **Code** hay que usar `toFormat` | `$now.toFormat('dd/MM/yyyy')` |
+| Error 422 al crear un encargo | La app aplica sus reglas (señal ≥ 10 €, entrega en 30 días) | Lee el motivo que devuelve |
+
+Así se ve el error `401` en n8n cuando la credencial `API Pastelería` no tiene la misma clave que el `.env`: el nodo se pone en rojo y avisa de «Authorization failed».
+
+![Un 401 en el nodo «Pagos de hoy»: revisa la credencial](imagenes/err-401-autorizacion-fallida.jpg)
+*Un 401 en el nodo «Pagos de hoy»: revisa la credencial*
+
