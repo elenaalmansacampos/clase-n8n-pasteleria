@@ -1,16 +1,49 @@
-# Sesión 1 · Avisos al cliente y cierre de caja
+# Sesión 2 · Errores, pagos por correo con IA y el agente
 
-Clase práctica para aprender, paso a paso, a automatizar un negocio pequeño con n8n: desde encender n8n con Docker hasta tener flujos reales funcionando, con un agente de IA ayudando.
+> Estás en la rama **`sesion-2`**. La vista general de la clase está en `main`.
 
-**Duración:** dos sesiones, unas 3 h 50 min en total.
+**Duración:** ~2 h · **Pasos 6 a 9** · **Flujos 00 y 03**
+
+**Qué vas a hacer:** que Marisa se entere cuando algo falla, construir el flujo difícil (**leer los correos del banco con IA y registrar los pagos**), pedirle un flujo nuevo a un agente y subirlo todo a tu repositorio.
 
 ---
 
-## Paso 1 — Levantar n8n (y la pastelería) en local con Docker (15 min)
+## Punto de partida
 
-**La idea en simple.** Un **contenedor** de Docker es una cocina portátil ya montada: trae dentro el programa con todo lo que necesita, así que **no instalas n8n ni Python en tu ordenador**. Lo enciendes, lo usas y, si lo apagas, tu ordenador queda como estaba.
+Esta sesión continúa la anterior. Necesitas:
 
-### 1.1 Comprueba que Docker funciona
+| Necesitas | Cómo comprobarlo | Si no lo tienes |
+|---|---|---|
+| Todo levantado | `docker compose ps` muestra `pasteleria`, `n8n` y `mailpit` | `cp .env.example .env && docker compose up -d` |
+| Las 3 credenciales de n8n: `Mailpit`, `API Pastelería` y `Groq` | n8n → *Credentials* | Créalas con la tabla de abajo |
+| Los flujos **01** y **02** funcionando y publicados | n8n → *Workflows* | Impórtalos de `referencia/` (*Import from file*), elige tus credenciales en cada nodo con triángulo rojo y publícalos |
+
+| Tipo | Nombre | Qué rellenar |
+|---|---|---|
+| **SMTP** | `Mailpit` | Host `mailpit` · Port `1025` · User y Password vacíos · SSL/TLS desactivado |
+| **Header Auth** | `API Pastelería` | Name `X-API-Key` · Value: tu `API_KEY` del `.env` |
+| **Groq** | `Groq` | Tu API key de Groq |
+
+> Recuerda: dentro de n8n, `localhost` es **su propio contenedor**. Usa `mailpit` y `http://pasteleria:8000`.
+
+Si empezaste la clase en otra máquina o borraste los datos (`down -v`), los datos de ejemplo se recargan solos.
+
+---
+
+## Paso 6 — Flujo 00: avisar si algo falla (15 min)
+
+**Objetivo:** que Marisa se entere cuando una automatización falla, en vez de descubrirlo semanas después.
+
+Así queda el flujo terminado:
+
+![Flujo 00: un disparador de errores y un correo](imagenes/p6-01-flujo-00-lienzo.jpg)
+*Flujo 00: un disparador de errores y un correo*
+
+1. Nuevo flujo: `00 Avisar de errores`.
+2. Primer nodo: **Error Trigger** (renómbralo `Si falla un flujo`).
+3. Nodo **Send Email** `Avisar a Marisa`: credencial `Mailpit`, To `marisa@lacuchara.example`.
+   - Subject: `Ha fallado el flujo «{{ $json.workflow.name }}»`
+   - Text:
 
 Ya tiene una **app** (carpetas `backend/` y `frontend/`) que guarda los encargos y los pagos. Nosotros no la tocamos: construimos con n8n **todo lo que pasa alrededor**.
 
@@ -338,7 +371,6 @@ La única diferencia entre los dos son `pagado`, `pendiente` y `estado`. El IF s
 
 **Checkpoint:** tres correos distintos en Mailpit y tres ejecuciones verdes. Con este flujo, cada encargo y cada pago avisan al cliente solos.
 
----
 
 ## Cómo está hecha la app (por si tienes curiosidad)
 
@@ -366,94 +398,100 @@ Por eso la carpeta se llama `frontend/` y no `templates/`: no son plantillas que
 
 ---
 
-## Estructura de este repositorio
+## Paso 8 — Repetir un flujo con el agente (30 min)
 
-**Objetivo:** cada noche, sumar lo cobrado en el día por forma de pago y mandárselo a Marisa. Este flujo **no lo activa un aviso de la app**, sino el **reloj**.
+Hasta aquí has construido a mano para entender cada pieza. Ahora trabajarás con un agente de IA: le pides **un flujo nuevo** y tú haces de *tech lead*: defines, revisas y decides.
 
-```
- Cada noche 21:00 ──▶ HTTP: pagos de hoy ──▶ Code: sumar por forma de pago ──▶ Correo a Marisa
-```
-clase-n8n-pasteleria/
-├── README.md              ← esta página (vista general)
-├── docker-compose.yml     ← app + n8n + Mailpit
-├── .env.example           ← copia a .env
-├── backend/               ← la lógica de la app (no hace falta tocarla)
-│   ├── main.py            ← junta las piezas
-│   ├── models/            ← M: datos y reglas del negocio
-│   ├── schemas/           ← la forma de los datos (Pydantic)
-│   ├── routes/            ← qué URL llega a qué función
-│   ├── controllers/       ← C: la lógica de cada petición
-│   ├── middleware/        ← la clave de la API y los errores
-│   ├── services/          ← los avisos a n8n
-│   └── tests/
-├── frontend/              ← V: la interfaz (HTML, CSS y JavaScript)
-├── Dockerfile             ← construye backend + frontend en una sola imagen
-├── data/correos/          ← los 7 correos de ejemplo de la sesión 2
-├── mis-flujos/            ← aquí guardas tus exportaciones de n8n
-├── (sesion-1) referencia/ ← flujos 01 y 02 terminados
-└── (sesion-2) referencia/ ← flujos 00, 01, 02 y 03 terminados
-```
-Hola Marisa,
+### 8.1 Dale contexto: `AGENTS.md`
 
-Hoy se han cobrado {{ $json.total }} € ({{ $json.n }} pagos):
+Crea este archivo en la raíz de tu carpeta y adáptalo:
 
-{{ $json.resumen }}
+```markdown
+# Pastelería La Cuchara: automatizaciones con n8n
+
+- La app (http://pasteleria:8000 dentro de Docker) guarda encargos y pagos. Se usa por API con la cabecera X-API-Key (credencial "API Pastelería" en n8n).
+- n8n corre en Docker. Los correos salen por la credencial SMTP "Mailpit".
+- Los flujos se guardan como JSON en `mis-flujos/` con el formato `NN-nombre.json`.
+- Los importes siempre los calcula la app: n8n solo los muestra.
+- NO escribir credenciales ni claves dentro de los JSON. NO publicar flujos sin que yo los haya probado.
 ```
 
-![El nodo «Enviar cierre a Marisa»](imagenes/p5-07-email-cierre-nodo.jpg)
-*El nodo «Enviar cierre a Marisa»*
+### 8.2 Escribe la spec antes de pedir nada
 
-7. **Execute workflow** (no hace falta esperar a las 21:00). El correo aparece en Mailpit con el total y el reparto.
+Ejemplo para un flujo nuevo, **Aviso de entrega mañana**:
 
-   ![Tras Execute workflow: los 3 pagos de hoy (3 items) se convierten en 1 resumen](imagenes/p5-08-ejecucion-cierre.jpg)
-   *Tras Execute workflow: los 3 pagos de hoy (3 items) se convierten en 1 resumen*
+```markdown
+## Spec: aviso de entrega mañana
+- Disparador: cada día a las 9:00.
+- Pide a la API los encargos `pendiente` y `pagado` con `fecha_entrega` de mañana (GET /api/encargos).
+- Si un encargo está `pagado`: correo al cliente "Mañana puedes recoger tu tarta".
+- Si está `pendiente`: correo al cliente "Mañana es la entrega y aún te faltan X €".
+- Si hay entregas mañana, un solo correo a Marisa con la lista. Si no hay ninguna, no se envía nada.
+- Criterios de aceptación: con los datos de ejemplo, el resultado coincide con lo que dice la app; no falla si no hay entregas.
+```
 
-   ![El correo de cierre de caja en Mailpit](imagenes/p5-09-correo-cierre.jpg)
-   *El correo de cierre de caja en Mailpit*
+### 8.3 Pídeselo al agente y revísalo
 
-8. **Comprueba que el total cuadra** con la app: en la pantalla **Pagos** (http://localhost:8000/pagos) suma a mano los de hoy.
-9. Pulsa **Publish** (confirma la ventana igual que en el flujo 01) para que se ejecute cada noche.
+1. Abre OpenCode en la carpeta y pega la spec con una frase como: *"Lee AGENTS.md y esta spec. Genera el flujo como un JSON importable en `mis-flujos/04-aviso-entrega.json`."*
+2. En n8n: **Import from file** (menú `···` del flujo, imagen del Paso 6). Las credenciales llegan sin asignar: abre cada nodo con un aviso y selecciona la tuya.
+3. **Revisa como si lo hubiera hecho otra persona**, con esta lista:
 
-**Checkpoint:** correo de cierre con importes que coinciden con la app. Marisa ya no tiene que sumar a mano.
-
----
-
-## Cierre de la sesión 1 (10 min)
-
-1. **Exporta tus dos flujos.** En cada uno: menú `···` → **Download** → guárdalo en `mis-flujos/` como `01-eventos.json` y `02-cierre.json`. Así tienes copia aunque borres n8n.
-2. **Comprueba el checklist:**
-
-| | |
+| Comprobación | ¿Está bien? |
 |---|---|
-| Las 4 URLs abren y los tres contenedores están en marcha | ☐ |
-| Un encargo creado en la app genera el correo de confirmación en Mailpit | ☐ |
-| Un pago genera el recibo, y el último pago genera «ya está pagado» | ☐ |
-| El flujo 02 manda un cierre con importes que coinciden con la app | ☐ |
-| Los flujos 01 y 02 están **publicados** | ☐ |
+| Los importes los toma de la app, no los calcula | |
+| No hay claves escritas en los nodos | |
+| Funciona con el caso de no haber entregas mañana | |
+| Los nombres de los nodos se entienden | |
+| Los textos de los correos son correctos | |
 
-3. **Para la sesión 2:**
-   - Ten lista tu **API key de Groq**.
-   - **No ejecutes `docker compose down -v`**: borraría tus flujos y tus credenciales. Para apagar todo sin perder nada, `docker compose down` (sin `-v`) o `docker compose stop`.
-   - Cuando empiece la sesión 2: `git switch sesion-2`.
+4. Si falla, **pásale el error y el flujo** (no solo "no funciona") y pide la corrección.
+5. Anota en `docs/ai-log.md`: el prompt, qué hizo bien, qué tuvo que corregirse.
+
+> **Opcional:** [n8n-mcp](https://github.com/czlonkowski/n8n-mcp) conecta el agente con tu n8n (necesita una API key de n8n: *Settings → n8n API*) para que cree y pruebe los flujos él mismo. Úsalo cuando ya domines lo básico.
 
 ---
 
-## Errores típicos de esta sesión
+## Paso 9 — Exportar y subir a Git (15 min)
+
+Los flujos viven dentro de n8n. Para guardarlos y compartirlos hay que **exportarlos a JSON**.
+
+1. En cada flujo: menú `···` (la misma de la imagen del Paso 6) → **Download**. Guárdalo en `mis-flujos/` con el formato `NN-nombre.json`.
+2. **Revisa que no hay secretos:** abre el JSON y busca tu clave de Groq o tu `API_KEY`. n8n solo guarda el **nombre y el id** de las credenciales, no su contenido, pero comprueba. Los textos pegados dentro de un nodo sí se exportan.
+3. Sube a **tu propio repositorio** (no al de la clase):
+
+```bash
+git remote -v                      # debe salir TU repositorio, no el de Factoría F5
+git switch -c flujos-esenciales
+git add mis-flujos/ AGENTS.md
+git commit -m "Añade flujos 00, 01, 02 y 03"
+git push -u origin flujos-esenciales
+```
+
+   Si todavía apunta al de la clase: `git remote remove origin`, crea un repo vacío en GitHub y `git remote add origin <url-de-tu-repo>`.
+
+> **Reimportar:** en un n8n nuevo, **Import from file** con cada JSON y vuelve a asignar las credenciales. Dentro de `referencia/` de esta rama tienes los cuatro flujos terminados: úsalos solo para comparar o si te atascas. Importa primero el `00` (los otros ya lo tienen elegido como *Error workflow*) y **publícalo**.
+
+---
+
+## 10. Errores típicos de esta sesión
 
 | Síntoma | Causa | Solución |
 |---|---|---|
-| `port is already allocated` al hacer `docker compose up` | Otro programa (u otro n8n) ya usa el puerto 5678, 8000 u 8025 | Ciérralo, o cambia el número de la **izquierda** en `docker-compose.yml` (por ejemplo `5679:5678`) |
-| La app crea el encargo pero no llega ningún correo | El flujo 01 no está **publicado** (la app usa la Production URL) | Mira **Avisos a n8n** en la app: si dice 404, pulsa **Publish** en el flujo |
-| `The requested webhook ... is not registered` | Igual que el anterior, o has usado `/webhook-test/` fuera de *Listen for test event* | Publicar, o pulsar *Listen for test event* antes del `curl` |
-| `ECONNREFUSED 127.0.0.1` o `localhost` no responde (SMTP o API) | Estás usando `localhost` dentro de n8n | Usa `mailpit` y `http://pasteleria:8000` |
-| `401 Unauthorized` al llamar a la app | La credencial `API Pastelería` no tiene la clave de tu `.env` | Revisa Name `X-API-Key` y el valor |
-| `No recipients defined` o `Cannot read properties of undefined` | La expresión no encuentra el dato. En el webhook los datos están en `body.datos`, no en `datos` | Usa `$json.body.datos...` en el flujo del webhook |
-| El flujo se para y no llega el cierre cuando no hay pagos | Falta **Always Output Data** en el HTTP Request | Actívalo en Settings del nodo |
-| `$now.format is not a function` | Dentro de un nodo **Code** hay que usar `toFormat` | `$now.toFormat('dd/MM/yyyy')` |
-| Error 422 al crear un encargo | La app aplica sus reglas (señal ≥ 10 €, entrega en 30 días) | Lee el motivo que devuelve |
+| Marisa no recibe el aviso de error | El flujo `00` no está publicado o no lo has elegido en *Settings → Error workflow* | Publícalo y asígnalo en cada flujo |
+| En el nodo de Groq, el campo Model dice `Error fetching options from Groq Chat Model` | La API key de la credencial `Groq` no es válida o no está bien copiada | Abre la credencial, pega de nuevo la clave de console.groq.com y guarda |
 
-Así se ve el error `401` en n8n cuando la credencial `API Pastelería` no tiene la misma clave que el `.env`: el nodo se pone en rojo y avisa de «Authorization failed».
+| La IA devuelve el importe como texto o mezcla campos | Prompt poco claro | Mejora el prompt y baja la temperatura a 0 |
+| `401` en el modelo | La API key de Groq no está bien copiada | Revisa la credencial `Groq` |
+| El pago de un caso ya no se registra al repetirlo | El encargo ya está pagado: cada pago cambia la app | Restablece los datos (ver Paso 7) |
+| Un nodo importado tiene un triángulo rojo | La credencial importada no existe en tu n8n | Abre el nodo y elige tu credencial |
+| `ECONNREFUSED 127.0.0.1` | Estás usando `localhost` dentro de n8n | Usa `mailpit` y `http://pasteleria:8000` |
 
-![Un 401 en el nodo «Pagos de hoy»: revisa la credencial](imagenes/err-401-autorizacion-fallida.jpg)
-*Un 401 en el nodo «Pagos de hoy»: revisa la credencial*
+---
 
+## 11. Para cerrar
+
+Comprueba que puedes **explicar con tus palabras**:
+
+1. ¿Por qué la app avisa a n8n con un webhook, en lugar de que n8n pregunte cada minuto?
+2. ¿Por qué en el flujo 03 la IA no decide a qué encargo va cada pago?
+3. ¿Qué pasa con el cierre de caja si ese día no se cobró nada y no activas *Always Output Data*?
