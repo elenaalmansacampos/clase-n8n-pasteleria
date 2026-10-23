@@ -1,5 +1,11 @@
 {
+  "updatedAt": "2026-10-23T09:14:10.001Z",
+  "createdAt": "2026-10-23T08:58:33.468Z",
+  "id": "qfbNUkA8bHjqNntw",
   "name": "Cierre diario",
+  "description": null,
+  "active": false,
+  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -91,7 +97,6 @@
       }
     }
   ],
-  "pinData": {},
   "connections": {
     "Schedule Trigger": {
       "main": [
@@ -127,17 +132,44 @@
       ]
     }
   },
-  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "6a5fcad3-c19b-42cd-b1b8-79b87da7f2b3",
+  "staticData": null,
   "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "ba7cdcebf2b425ef8604167b6de92e5de63bb49c0715d13f14f8243073c76aed"
+    "templateCredsSetupCompleted": true
   },
   "nodeGroups": [],
-  "id": "qfbNUkA8bHjqNntw",
-  "tags": []
+  "pinData": {},
+  "versionId": "6a5fcad3-c19b-42cd-b1b8-79b87da7f2b3",
+  "activeVersionId": null,
+  "versionCounter": 25,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-10-23T08:58:33.470Z",
+      "createdAt": "2026-10-23T08:58:33.470Z",
+      "role": "workflow:owner",
+      "workflowId": "qfbNUkA8bHjqNntw",
+      "projectId": "mvffmsuEIAVXedoE",
+      "project": {
+        "updatedAt": "2026-10-22T10:20:30.272Z",
+        "createdAt": "2026-10-21T10:23:09.568Z",
+        "id": "mvffmsuEIAVXedoE",
+        "name": "Elena elenaalmansacampos@gmail.com <elenaalmansacampos@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "8d5f314f-cd27-48d2-986b-e291650f800e"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
 }

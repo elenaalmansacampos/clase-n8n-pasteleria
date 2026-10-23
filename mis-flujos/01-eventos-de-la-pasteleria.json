@@ -1,5 +1,11 @@
 {
-  "name": "Eventos de pasteleria",
+  "updatedAt": "2026-10-23T10:42:34.814Z",
+  "createdAt": "2026-10-22T10:20:52.009Z",
+  "id": "gqWpNVhovgC9y7SV",
+  "name": "01 Eventos de pasteleria",
+  "description": null,
+  "active": false,
+  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -199,7 +205,6 @@
       "name": "¿Queda pagado?"
     }
   ],
-  "pinData": {},
   "connections": {
     "Webhook": {
       "main": [
@@ -249,17 +254,48 @@
       ]
     }
   },
-  "active": true,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "6YScC8URe83ydRuk",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
   },
-  "versionId": "27f6a871-e0ca-4b19-8c4f-1e1d6b8141bd",
+  "staticData": null,
   "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "ba7cdcebf2b425ef8604167b6de92e5de63bb49c0715d13f14f8243073c76aed"
+    "templateCredsSetupCompleted": true
   },
   "nodeGroups": [],
-  "id": "gqWpNVhovgC9y7SV",
-  "tags": []
+  "pinData": {},
+  "versionId": "3d7ecfbb-8c5b-4a12-ae5a-6688459d2bb1",
+  "activeVersionId": null,
+  "versionCounter": 94,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-10-22T10:20:52.011Z",
+      "createdAt": "2026-10-22T10:20:52.011Z",
+      "role": "workflow:owner",
+      "workflowId": "gqWpNVhovgC9y7SV",
+      "projectId": "mvffmsuEIAVXedoE",
+      "project": {
+        "updatedAt": "2026-10-22T10:20:30.272Z",
+        "createdAt": "2026-10-21T10:23:09.568Z",
+        "id": "mvffmsuEIAVXedoE",
+        "name": "Elena elenaalmansacampos@gmail.com <elenaalmansacampos@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "8d5f314f-cd27-48d2-986b-e291650f800e"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
 }

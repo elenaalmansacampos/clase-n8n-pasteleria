@@ -1,0 +1,100 @@
+{
+  "updatedAt": "2026-10-23T10:37:20.882Z",
+  "createdAt": "2026-10-23T09:56:00.427Z",
+  "id": "6YScC8URe83ydRuk",
+  "name": "00 Avisar de errores",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "efb4fd2f-7e89-4328-b25f-4b9c32bdb2c9",
+      "name": "Si falla un flujo"
+    },
+    {
+      "parameters": {
+        "fromEmail": "pasteleria@lacuchara.example",
+        "toEmail": "marisa@lacuchara.example",
+        "subject": "=Ha fallado el flujo «{{ $json.workflow.name }}»",
+        "emailFormat": "text",
+        "text": "Hola Marisa,\n\nUna automatización ha fallado.\n\nFlujo: {{ $json.workflow.name }}\nPaso: {{ $json.execution.lastNodeExecuted }}\nError: {{ $json.execution.error.message }}\nEjecución: {{ $json.execution.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "002afa25-aed3-45cd-a51d-601036836c2c",
+      "name": "Avisar a Marisa",
+      "webhookId": "cde0b53a-bb38-4896-8a1c-34d92404a2fb",
+      "credentials": {
+        "smtp": {
+          "id": "60fcTfPeXFNHApC7",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Si falla un flujo": {
+      "main": [
+        [
+          {
+            "node": "Avisar a Marisa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "637818db-7403-4d2e-a799-8ee556261258",
+  "activeVersionId": "637818db-7403-4d2e-a799-8ee556261258",
+  "versionCounter": 12,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-10-23T09:56:00.430Z",
+      "createdAt": "2026-10-23T09:56:00.430Z",
+      "role": "workflow:owner",
+      "workflowId": "6YScC8URe83ydRuk",
+      "projectId": "mvffmsuEIAVXedoE",
+      "project": {
+        "updatedAt": "2026-10-22T10:20:30.272Z",
+        "createdAt": "2026-10-21T10:23:09.568Z",
+        "id": "mvffmsuEIAVXedoE",
+        "name": "Elena elenaalmansacampos@gmail.com <elenaalmansacampos@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "8d5f314f-cd27-48d2-986b-e291650f800e"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 637818db",
+    "description": ""
+  }
+}

@@ -1,0 +1,164 @@
+{
+  "updatedAt": "2026-10-23T12:07:22.932Z",
+  "createdAt": "2026-10-23T12:07:22.932Z",
+  "id": "QzujSS5DKYMYdMdR",
+  "name": "04 Aviso de entrega mañana",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2aed2c45-029f-44ef-9356-bce2baddb5e5",
+      "name": "Cada día a las 9:00"
+    },
+    {
+      "parameters": {
+        "url": "http://pasteleria:8000/api/encargos",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        0
+      ],
+      "id": "c5916281-a97f-4f6f-b1a2-5ad9a01d0b8e",
+      "name": "Encargos de la app",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "zmER38M2rhy18iMx",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fechaISO = $now.plus({ days: 1 }).toFormat('yyyy-MM-dd');\nconst fechaHumana = $now.plus({ days: 1 }).toFormat('dd/MM/yyyy');\nconst encargos = $input.all().map(i => i.json).filter(e => e.id && e.fecha_entrega === fechaISO);\n\nif (!encargos.length) return [];\n\nconst avisos = encargos.map(e => {\n  const pendiente = Number(e.pendiente);\n  const texto = e.estado === 'pagado'\n    ? `Hola ${e.cliente},\\n\\nMañana ${fechaHumana} puedes recoger tu ${e.tarta} (${e.raciones} raciones).\\n\\n¡Te esperamos!\\n\\nPastelería La Cuchara`\n    : `Hola ${e.cliente},\\n\\nMañana ${fechaHumana} es la entrega de tu ${e.tarta} (${e.raciones} raciones) y aún te faltan ${pendiente.toFixed(2)} €.\\n\\nPuedes pagar al recogerla.\\n\\nPastelería La Cuchara`;\n  return { json: { destinatario: e.email, asunto: `Tu encargo #${e.id}: entrega mañana`, texto } };\n});\n\nconst lineas = encargos.map(e => {\n  const estado = e.estado === 'pagado' ? 'pagado' : `pendiente: ${Number(e.pendiente).toFixed(2)} €`;\n  return `#${e.id} ${e.cliente} — ${e.tarta} (${estado})`;\n});\navisos.push({ json: {\n  destinatario: 'marisa@lacuchara.example',\n  asunto: `Entregas de mañana: ${encargos.length}`,\n  texto: `Hola Marisa,\\n\\nMañana ${fechaHumana} hay ${encargos.length} entrega(s):\\n\\n${lineas.join('\\n')}\\n\\nPastelería La Cuchara`,\n}});\nreturn avisos;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "id": "25167777-4e84-46fb-b613-d69bdc3d5857",
+      "name": "Preparar avisos"
+    },
+    {
+      "parameters": {
+        "fromEmail": "pasteleria@lacuchara.example",
+        "toEmail": "={{ $json.destinatario }}",
+        "subject": "={{ $json.asunto }}",
+        "emailFormat": "text",
+        "text": "={{ $json.texto }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        720,
+        0
+      ],
+      "id": "be225e50-3c0f-4b14-8a4e-e2d31744dc27",
+      "name": "Enviar aviso",
+      "credentials": {
+        "smtp": {
+          "id": "60fcTfPeXFNHApC7",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cada día a las 9:00": {
+      "main": [
+        [
+          {
+            "node": "Encargos de la app",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encargos de la app": {
+      "main": [
+        [
+          {
+            "node": "Preparar avisos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar avisos": {
+      "main": [
+        [
+          {
+            "node": "Enviar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "c0bcadb1-e5f2-44f2-be32-739f4859fabe",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-10-23T12:07:22.933Z",
+      "createdAt": "2026-10-23T12:07:22.933Z",
+      "role": "workflow:owner",
+      "workflowId": "QzujSS5DKYMYdMdR",
+      "projectId": "mvffmsuEIAVXedoE",
+      "project": {
+        "updatedAt": "2026-10-22T10:20:30.272Z",
+        "createdAt": "2026-10-21T10:23:09.568Z",
+        "id": "mvffmsuEIAVXedoE",
+        "name": "Elena elenaalmansacampos@gmail.com <elenaalmansacampos@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "8d5f314f-cd27-48d2-986b-e291650f800e"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}
