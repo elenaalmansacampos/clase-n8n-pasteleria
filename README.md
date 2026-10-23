@@ -45,356 +45,260 @@ Así queda el flujo terminado:
    - Subject: `Ha fallado el flujo «{{ $json.workflow.name }}»`
    - Text:
 
-Ya tiene una **app** (carpetas `backend/` y `frontend/`) que guarda los encargos y los pagos. Nosotros no la tocamos: construimos con n8n **todo lo que pasa alrededor**.
+```
+Hola Marisa,
 
-```bash
-docker --version
-docker compose version
-docker ps
+Una automatización ha fallado.
+
+Flujo: {{ $json.workflow.name }}
+Paso: {{ $json.execution.lastNodeExecuted }}
+Error: {{ $json.execution.error.message }}
+Ejecución: {{ $json.execution.url }}
 ```
 
-Los dos primeros muestran una versión y el tercero una tabla (vacía si no tienes nada en marcha). Si sale `Cannot connect to the Docker daemon`, Docker Desktop no está abierto del todo.
+![El nodo «Avisar a la dueña»: asunto y texto con los datos del error](imagenes/p6-02-email-aviso-error-nodo.jpg)
+*El nodo «Avisar a la dueña»: asunto y texto con los datos del error*
 
-### 1.2 n8n solo, con un único comando (3 min)
+4. **Publish** (confirma la ventana del nombre de versión, como en la sesión 1).
+5. **Conéctalo a los otros flujos.** Abre el flujo `01`, menú `···` → **Settings** → **Error workflow** → elige `00 Avisar de errores` → **Save**. Repite en el `02` (y más tarde en el `03`).
 
-Para ver lo mínimo que hace falta, arranca n8n a pelo:
+   ![El menú `···` del flujo: aquí están Settings, Download e Import from file](imagenes/p6-03-menu-flujo.jpg)
+   *El menú `···` del flujo: aquí están Settings, Download e Import from file*
 
-```bash
-docker run -it --rm --name n8n -p 5678:5678 -v n8n_data:/home/node/.n8n docker.n8n.io/n8nio/n8n
-```
+   ![En Settings, el campo «Error Workflow» apunta al flujo 00](imagenes/p6-04-ajustes-error-workflow.jpg)
+   *En Settings, el campo «Error Workflow» apunta al flujo 00*
 
-| Parte del comando | En simple |
-|---|---|
-| `docker run` | Enciende un contenedor |
-| `-it --rm` | Te deja ver lo que pasa dentro, y lo borra al apagarlo |
-| `--name n8n` | Le pone nombre |
-| `-p 5678:5678` | Abre la puerta: lo que haya en el puerto 5678 del contenedor se ve en `http://localhost:5678` |
-| `-v n8n_data:/home/node/.n8n` | Una **caja de guardado** (volumen): tus flujos y credenciales viven ahí y sobreviven al apagarlo |
-| `docker.n8n.io/n8nio/n8n` | La imagen: la receta de la cocina portátil. La primera vez la descarga |
-
-Cuando el texto diga `Editor is now accessible via: http://localhost:5678`, abre esa dirección: ya tienes n8n. **Páralo con `Ctrl + C`** antes de seguir: lo vamos a encender de otra forma y los dos usarían el mismo puerto.
-
-### 1.3 Todo junto con `docker compose`
-
-Nosotros necesitamos **tres piezas** a la vez (la app de la pastelería, n8n y el buzón Mailpit), así que en vez de tres comandos usamos un archivo, `docker-compose.yml`, que las describe y las enciende juntas:
+6. **Provócalo.** Con el `01` publicado, envía un evento roto (sin `datos`):
 
 ```bash
-cd clase-n8n-pasteleria
-cp .env.example .env
-docker compose up -d
+curl -X POST http://localhost:5678/webhook/pasteleria \
+  -H "Content-Type: application/json" -d '{"evento":"encargo.creado"}'
 ```
 
-La primera vez construye la app y descarga las imágenes (unos minutos). `-d` lo deja funcionando **en segundo plano**.
+   El flujo 01 falla (no hay a quién enviar el correo) y en Mailpit aparece el aviso: flujo `01 Eventos de la pastelería`, paso `Confirmar encargo` y error `No recipients defined`.
 
-| Servicio | URL | Para qué |
-|---|---|---|
-| App de la pastelería | http://localhost:8000 | La pantalla de Marisa: encargos, pagos y descarga en Excel |
-| API de la app | http://localhost:8000/docs | Lo que usará n8n, documentado en Swagger |
-| n8n | http://localhost:5678 | Donde construimos los flujos |
-| Mailpit | http://localhost:8025 | El buzón donde llegan todos los correos |
-
-### 1.4 Primera vez en n8n
-
-n8n te pide **crear una cuenta de propietario** (es local, solo para tu instancia). Pon lo que quieras. Después salen dos ventanas opcionales (un cuestionario y una oferta de licencia): cierra la primera con **Get started** sin responder y la segunda con **Skip**.
-
-![Crear la cuenta de propietario (los datos son de ejemplo)](imagenes/p1-01-n8n-cuenta-propietario.jpg)
-*Crear la cuenta de propietario (los datos son de ejemplo)*
-
-![El cuestionario opcional: pulsa Get started sin responder](imagenes/p1-02-n8n-cuestionario.jpg)
-*El cuestionario opcional: pulsa Get started sin responder*
-
-![Así se ve n8n recién estrenado](imagenes/p1-03-n8n-inicio.jpg)
-*Así se ve n8n recién estrenado*
+   ![El aviso que recibe Marisa: flujo, paso y error](imagenes/p6-05-correo-aviso-error.jpg)
+   *El aviso que recibe Marisa: flujo, paso y error*
 
 
-### 1.5 Comandos que vas a usar (guárdalos)
+   > Para que el aviso salga, el flujo `00` tiene que estar **publicado**. Si no lo está, n8n lo anota en sus registros (`Workflow ... is not active`) y no avisa a nadie.
 
-| Quiero… | Comando |
-|---|---|
-| Ver qué está encendido | `docker compose ps` |
-| Ver lo que escribe n8n (para buscar errores) | `docker compose logs -f n8n` (sal con `Ctrl + C`) |
-| Apagar todo **sin perder nada** | `docker compose stop` (y `docker compose start` para volver) |
-| Apagar y quitar los contenedores | `docker compose down` (tus flujos se conservan) |
-| Empezar **de cero** | `docker compose down -v` ⚠️ borra los volúmenes: **tus flujos y credenciales desaparecen** |
+> **Seguridad:** el aviso lleva el nombre del flujo, el paso y el mensaje, **nunca** claves ni contraseñas. Revisa el correo antes de dar el flujo por bueno.
 
-
-![La app de la pastelería en http://localhost:8000](imagenes/p1-04-app-encargos.jpg)
-*La app de la pastelería en http://localhost:8000*
-
-![Mailpit en http://localhost:8025, todavía sin correos](imagenes/p1-05-mailpit-vacio.jpg)
-*Mailpit en http://localhost:8025, todavía sin correos*
-
-**Checkpoint:** las cuatro URLs abren. `docker compose ps` muestra tres servicios `running`. En Mailpit todavía no hay ningún correo.
+**Checkpoint:** un fallo provocado genera un correo de aviso.
 
 ---
 
-## Paso 2 — Conocer la app (15 min)
+## Paso 7 — Flujo 03: leer los correos del banco con IA (50 min)
 
-La app es el **mostrador** de la pastelería: ahí se apuntan encargos y pagos. n8n no la sustituye, trabaja detrás.
+Es el flujo más difícil de la clase. **Objetivo:** cuando llega un aviso del banco de que un cliente ha pagado por Bizum o transferencia, registrar el pago en el encargo correcto, **sin que Marisa apunte nada**.
 
-**La pantalla** — http://localhost:8000
+> **La regla de oro: la IA lee, el código decide.** La IA solo sirve para convertir un texto desordenado (el correo) en datos ordenados (quién, cuánto, para qué). **Qué encargo es y si se puede registrar lo decide un nodo de código con reglas claras**, porque una IA a veces se equivoca y un pago mal asignado es dinero mal apuntado.
 
-1. En **Encargos** verás los 8 de ejemplo, con lo **pagado** y lo **pendiente** de cada uno, y un aviso de color cuando la entrega está cerca. Prueba el buscador y las pestañas *Pendientes / Pagados / Todos*.
-2. Abre un encargo (por ejemplo el #3): ves lo pagado, una barra de progreso y la lista de pagos.
-3. En **Pagos** está el historial completo. **Descargar Excel** baja todos los datos en una hoja por tabla.
-4. Pulsa **Nuevo encargo**. Hay dos formas de equivocarse y cada una la avisa alguien distinto:
-   - Pon una señal de **5 €**: es el **propio navegador** quien avisa («Value must be greater than or equal to 10») y no deja enviar.
-   - Pon una fecha de entrega **dentro de más de 30 días** y una señal de 10 €: ahora la que lo rechaza es **la app**, y el formulario vuelve **sin perder lo que escribiste**.
-   Después créalo bien.
+```
+ Pegar correo ──▶ IA: extraer datos ──▶ ¿es un pago? ──sí──▶ GET encargos pendientes ──▶ Code: buscar el encargo
+                                              │ no                                              │
+                                              ▼                                                 ▼
+                                      Ignorar (publicidad)                         ¿se puede registrar?
+                                                                              sí ──▶ POST pago a la app
+                                                                              no ──▶ Correo a Marisa: "revisa esto"
+```
 
-   ![Ficha de un encargo: lo pagado, lo pendiente y el formulario para registrar un pago](imagenes/p2-01-encargo-ficha.jpg)
-   *Ficha de un encargo: lo pagado, lo pendiente y el formulario para registrar un pago*
+En un negocio real el disparador sería un **correo nuevo** (Gmail o IMAP). Aquí usamos un **formulario donde pegas el texto del correo**, que es más fácil de probar y no necesita ninguna cuenta. Cambiarlo después es sustituir un solo nodo.
 
-   ![La pantalla Pagos, con el historial completo](imagenes/p2-02-pagos.jpg)
-   *La pantalla Pagos, con el historial completo*
+Así queda el flujo terminado (puedes volver a esta imagen para comprobar el tuyo):
 
-   ![Con una señal de 5 € el navegador avisa antes de enviar](imagenes/p2-04-nuevo-encargo-aviso-navegador.jpg)
-   *Con una señal de 5 € el navegador avisa antes de enviar*
+![Flujo 03 completo: formulario, IA, decisión, consulta a la app, código, y registrar o preguntar](imagenes/p7-01-flujo-03-lienzo.jpg)
+*Flujo 03 completo: formulario, IA, decisión, consulta a la app, código, y registrar o preguntar*
 
-   ![Con una entrega a más de 30 días la rechaza la app, y conserva lo escrito](imagenes/p2-05-nuevo-encargo-rechazado.jpg)
-   *Con una entrega a más de 30 días la rechaza la app, y conserva lo escrito*
+### Los correos de prueba
 
-   ![Encargo creado correctamente](imagenes/p2-06-encargo-creado.jpg)
-   *Encargo creado correctamente*
+Están en `data/correos/`. Son 7 y cubren los casos que tu flujo debe resolver:
 
-
-**Las reglas** que aplica la app (tú no las programas, las usas):
-
-| Regla | Detalle |
-|---|---|
-| Señal | Mínimo **10 €** al crear el encargo |
-| Entrega | Entre mañana y dentro de **30 días** |
-| Pagos | Se puede pagar en partes, pero **nunca más de lo que falta** |
-| Pagado | Cuando lo pendiente llega a 0 €, el encargo pasa a `pagado` |
-
-**La API** — http://localhost:8000/docs
-
-Es lo que usará n8n. Pulsa **Authorize** (arriba a la derecha) y escribe el valor de `API_KEY` de tu `.env` (`cambia-esta-clave`). Prueba `GET /api/encargos` (**Try it out → Execute**): los mismos encargos, pero como datos.
-
-La pantalla que acabas de usar **también pide sus datos a esta API**: es un cliente más, igual que lo será n8n. Por eso, en el repositorio, la interfaz está en `frontend/` y la lógica en `backend/` (en el README de `main` tienes el esquema).
-
-### Los cuatro flujos que vas a construir
-
-| Flujo | Qué hace | Sesión |
+| Archivo | Qué pasa | Resultado esperado |
 |---|---|---|
-| **01** Eventos de la pastelería | Cuando la app avisa, manda al cliente la confirmación del encargo y los recibos de pago | 1 |
-| **02** Cierre diario | Cada noche suma lo cobrado en el día y se lo manda a Marisa | 1 |
-| **00** Avisar de errores | Si un flujo falla, avisa a Marisa con el motivo | 2 |
-| **03** Pagos por correo | Lee los avisos del banco con IA y registra cada pago en su encargo | 2 |
+| `01_bizum_carmen` | Ordenante con nombre y dos apellidos, un solo encargo posible | Se registra el pago (12 €) → el encargo #1 queda **pagado** |
+| `02_bizum_jorge` | Ordenante abreviado (`JORGE M.`), pero el concepto dice `encargo 2` | Se registra el pago (15 €) en el encargo #2 |
+| `03_transferencia_lucia` | Transferencia, nombre completo | Se registra (10 €) → el encargo #3 queda **pagado** |
+| `04_bizum_laura_de_mas` | Paga 10 € pero al encargo solo le faltan 5 € | **No se registra**: aviso a Marisa |
+| `05_bizum_ana_ya_pagado` | Ana ya tiene su encargo pagado | **No se registra**: aviso a Marisa |
+| `06_transferencia_desconocido` | Nadie con ese nombre | **No se registra**: aviso a Marisa |
+| `07_publicidad_banco` | No es un pago | Se **ignora**, sin avisar a nadie |
 
----
+> Los datos de ejemplo se cargan con **fechas de hoy**, así que estos casos funcionan cualquier día. Pero **cada pago que registras cambia la app**: si repites un caso, el resultado cambia (el encargo ya estará pagado). Para volver al principio **sin tocar tus flujos**, restablece solo los datos de la app:
+>
+> ```bash
+> curl -X POST http://localhost:8000/api/reset -H "X-API-Key: cambia-esta-clave"
+> ```
 
-## Paso 4 — Flujo 01: confirmar encargos y mandar recibos (40 min)
+### 7.1 El disparador: pegar el correo
 
-**Objetivo:** cuando la app avise de un evento, enviar el correo adecuado al cliente.
-
-| Sesión | Rama | Pasos | Duración | Al terminar tienes funcionando |
-|---|---|---|---|---|
-| **1** | `sesion-1` | 1 a 5 | ~1 h 50 | Todo levantado y conectado, los **avisos al cliente** (flujo 01) y el **cierre de caja** (flujo 02) |
-| **2** | `sesion-2` | 6 a 9 | ~2 h | **Aviso de errores** (flujo 00), **pagos por correo con IA** (flujo 03), un flujo hecho con el agente y todo subido a tu repositorio |
-
-![Flujo 01 completo: webhook, Switch, un IF y tres correos](imagenes/p4-01-flujo-01-lienzo.jpg)
-*Flujo 01 completo: webhook, Switch, un IF y tres correos*
-
-### 4.1 Crear el flujo y el disparador
-
-1. **Create workflow** (esquina superior). Ponle nombre arriba: `01 Eventos de la pastelería`.
-2. **Add first step** → busca **Webhook** y añádelo. Configúralo:
+Nuevo flujo `03 Pagos por correo`. Primer nodo: **On form submission** (*Form Trigger*), renómbralo `Pegar correo`:
 
 | Campo | Valor |
 |---|---|
-| HTTP Method | `POST` |
-| Path | `pasteleria` |
-| Respond | `Immediately` |
+| Form Title | `Correo del banco` |
+| Form Elements → Add (+) → Field Name | `Correo` |
+| Form Elements → Element Type | `Textarea` |
+| Form Elements → Required Field | activado |
 
-Renombra el nodo a `Evento de la pastelería` (clic en el nombre o `F2`).
+Pulsa **Execute step** y se abre un formulario en el navegador. Pega el contenido de `data/correos/01_bizum_carmen.txt` y envía.
 
-> **Dos URLs, una trampa.** El nodo muestra una **Test URL** (`/webhook-test/pasteleria`) y una **Production URL** (`/webhook/pasteleria`). La **Test URL** solo funciona unos segundos, cuando pulsas *Listen for test event* o *Execute workflow*. La **Production URL** solo funciona cuando el flujo está **publicado**. La app usa la de producción.
+![El nodo «Pegar correo»](imagenes/p7-02-form-trigger-nodo.jpg)
+*El nodo «Pegar correo»*
 
-![El nodo Webhook con la pestaña Test URL](imagenes/p4-02-webhook-test-url.jpg)
-*El nodo Webhook con la pestaña Test URL*
+![El formulario que se abre en el navegador](imagenes/p7-12-formulario-vacio.jpg)
+*El formulario que se abre en el navegador*
 
-![La misma pantalla con la pestaña Production URL: es la que usa la app](imagenes/p4-03-webhook-production-url.jpg)
-*La misma pantalla con la pestaña Production URL: es la que usa la app*
-
-
-### 4.2 Probar con un evento de mentira
-
-Para desarrollar sin tocar la app, simulamos el aviso con `curl`. En n8n, pulsa **Listen for test event** (o *Execute step*) en el nodo Webhook y **en los siguientes 2 minutos** ejecuta en tu terminal:
-
-```bash
-git clone https://github.com/Factoria-F5-madrid/clase-n8n-pasteleria.git clase-n8n-pasteleria
-cd clase-n8n-pasteleria
-git switch sesion-1          # y en la segunda sesión: git switch sesion-2
-```
-
-El nodo se llena con el aviso. Fíjate en la pestaña **Output**: los datos están en `body.evento` y `body.datos`. **Anota esto: el JSON que envía la app está dentro de `body`.**
+![Pega aquí el texto del correo y pulsa Submit (la imagen muestra uno ya pegado)](imagenes/p7-13-formulario-con-correo.jpg)
+*Pega aquí el texto del correo y pulsa Submit (la imagen muestra uno ya pegado)*
 
 
-![Tras pulsar «Listen for test event», n8n espera el aviso (tienes un par de minutos)](imagenes/p4-08-webhook-escuchando.jpg)
-*Tras pulsar «Listen for test event», n8n espera el aviso (tienes un par de minutos)*
+### 7.2 La IA extrae los datos
 
-![Llega el aviso: los datos están dentro de `body` (cambia a la vista JSON arriba a la derecha)](imagenes/p4-09-webhook-salida-json.jpg)
-*Llega el aviso: los datos están dentro de `body` (cambia a la vista JSON arriba a la derecha)*
-
-### 4.3 Repartir según el evento (Switch)
-
-1. Añade un nodo **Switch** conectado al Webhook. Renómbralo `Según el evento`.
-2. **Mode:** `Rules`. Crea dos reglas:
-
-| Regla | Value 1 (expresión) | Operador | Value 2 | Renombrar salida a |
-|---|---|---|---|---|
-| 1 | `{{ $json.body.evento }}` | String → is equal to | `encargo.creado` | `encargo.creado` |
-| 2 | `{{ $json.body.evento }}` | String → is equal to | `pago.registrado` | `pago.registrado` |
-
-> Para escribir una **expresión**, en el campo pulsa *Expression* (o escribe `{{`). Todo lo que va entre `{{ }}` es JavaScript que n8n calcula para cada item.
-
-Pulsa **Execute step**: con el evento `encargo.creado` el item sale por la salida 1.
-
-
-![Las reglas del Switch (aquí la 1 desplegada)](imagenes/p4-04-switch-reglas.jpg)
-*Las reglas del Switch (aquí la 1 desplegada)*
-
-### 4.4 Correo de confirmación
-
-En la salida `encargo.creado` añade el nodo **Send Email** (el de *Send email*, con el sobre). Renómbralo `Confirmar encargo`:
+1. Añade el nodo **Information Extractor** (de la sección AI) llamado `Extraer datos del correo`:
 
 | Campo | Valor |
 |---|---|
-| Credential | `Mailpit` |
-| From Email | `pasteleria@lacuchara.example` |
-| To Email | `{{ $json.body.datos.email }}` |
-| Subject | `Tu encargo #{{ $json.body.datos.id }} está confirmado` |
-| Email Format | `Text` |
-| Text | ver abajo |
+| Text | `{{ $json.Correo }}` |
+| Schema Type | `Generate From JSON Example` |
+| JSON Example | ver abajo |
+| Options → **System Prompt Template** | ver abajo |
 
-```
-Hola {{ $json.body.datos.cliente }},
+JSON Example (le dice a la IA la forma exacta de la respuesta; n8n avisa de que **todas las propiedades serán obligatorias**, está bien):
 
-Hemos apuntado tu encargo: {{ $json.body.datos.tarta }} para {{ $json.body.datos.raciones }} raciones.
-
-Precio: {{ $json.body.datos.precio.toFixed(2) }} €
-Pagado: {{ $json.body.datos.pagado.toFixed(2) }} €
-Pendiente: {{ $json.body.datos.pendiente.toFixed(2) }} €
-Entrega: {{ $json.body.datos.fecha_entrega }}
-
-Pastelería La Cuchara
+```json
+{ "es_pago": true, "ordenante": "CARMEN RUIZ", "importe": 12.5, "forma": "bizum", "concepto": "tarta queso" }
 ```
 
-En **Options** (*Add option*) desactiva **Append n8n Attribution** para que no añada la firma de n8n.
+System Prompt Template (pulsa *Add option* → *System Prompt Template*):
 
-Pulsa **Execute step** y abre **Mailpit** (http://localhost:8025): el correo debe estar allí.
+```
+Eres un asistente que lee correos de un banco para una pastelería. Decide si el correo avisa de un pago recibido (Bizum o transferencia): es_pago=true; si es publicidad u otra cosa, es_pago=false. Extrae el nombre de quien paga (ordenante), el importe como número con punto decimal, la forma (bizum o transferencia) y el concepto. Si un dato no aparece, déjalo vacío. No inventes nada.
+```
 
-> **Los importes los da la app, nunca los calculamos nosotros.** `toFixed(2)` solo los muestra con dos decimales.
+
+![El nodo Information Extractor: texto, ejemplo de JSON...](imagenes/p7-03-extractor-nodo.jpg)
+*El nodo Information Extractor: texto, ejemplo de JSON...*
+
+![...y más abajo, el System Prompt Template](imagenes/p7-04-extractor-prompt.jpg)
+*...y más abajo, el System Prompt Template*
+
+2. El nodo tiene un conector inferior **Model**. Pulsa el `+`, elige **Groq Chat Model**, credencial `Groq`, **Model** `llama-3.3-70b-versatile`. En *Add option* → **Sampling Temperature** `0` (así responde siempre igual al mismo correo).
+3. **Execute step.** En Output debe aparecer `output.ordenante = "CARMEN RUIZ GARCIA"`, `output.importe = 12`, `output.forma = "bizum"`.
+4. **Pruébalo con los 7 correos.** Fíjate sobre todo en el `07` (`es_pago` debe ser `false`) y el `02` (`ordenante` = `JORGE M.`, `concepto` = `encargo 2`).
+
+> Si algún campo sale mal, **mejora el prompt**, no añadas parches de código. Anota el cambio en tu bitácora de IA.
+
+### 7.3 ¿Es un pago?
+
+Nodo **IF** `¿Es un pago?`: Value 1 `{{ $json.output.es_pago }}` → Boolean → **is true**.
+La salida **false** conecta a un nodo **No Operation, do nothing** llamado `Ignorar correo`: aquí termina la publicidad.
+
+![El IF «¿Es un pago?»: `es_pago` es true](imagenes/p7-05-if-es-pago.jpg)
+*El IF «¿Es un pago?»: `es_pago` es true*
 
 
-![El nodo «Confirmar encargo»: credencial, remitente, destinatario, asunto y texto con expresiones](imagenes/p4-05-email-confirmar.jpg)
-*El nodo «Confirmar encargo»: credencial, remitente, destinatario, asunto y texto con expresiones*
+### 7.4 Pedir a la app los encargos pendientes
 
-![Más abajo, la opción para quitar la firma de n8n (Append n8n Attribution apagada)](imagenes/p4-06-email-sin-firma.jpg)
-*Más abajo, la opción para quitar la firma de n8n (Append n8n Attribution apagada)*
+En la salida **true**, nodo **HTTP Request** `Encargos pendientes`: Method `GET`, URL `http://pasteleria:8000/api/encargos`, la misma autenticación Header Auth (`API Pastelería`), Query `estado` = `pendiente`, y **Always Output Data** activado en Settings.
 
-### 4.5 Recibo de pago o "ya está pagado" (IF)
+![El nodo «Encargos pendientes»: GET a la API con la credencial y `estado=pendiente`](imagenes/p7-06-http-encargos-pendientes.jpg)
+*El nodo «Encargos pendientes»: GET a la API con la credencial y `estado=pendiente`*
 
-Conecta la salida `pago.registrado` del Switch a un nodo **IF** llamado `¿Queda pagado?`:
 
-| Campo | Valor |
+### 7.5 El código que decide
+
+Nodo **Code** `Buscar el encargo` (*Run Once for All Items*). Cuando algo no está claro, **nunca registra**: avisa a Marisa.
+
+```javascript
+const datos = $('Extraer datos del correo').first().json.output;
+const pendientes = $input.all().map(i => i.json).filter(e => e.id);
+const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').trim();
+
+let candidatos = [];
+const porNumero = norm(datos.concepto).match(/(?:encargo|pedido)\s*(\d+)/);
+if (porNumero) {
+  candidatos = pendientes.filter(e => e.id === Number(porNumero[1]));
+} else {
+  // Nombre: el primer nombre coincide y el siguiente apellido empieza igual (sirve "JORGE M.")
+  const t = norm(datos.ordenante).split(/\s+/).filter(Boolean);
+  candidatos = pendientes.filter(e => {
+    const c = norm(e.cliente).split(/\s+/);
+    return t.length >= 2 && c[0] === t[0] && c.slice(1).some(w => w.startsWith(t[1]) || t[1].startsWith(w));
+  });
+}
+
+const base = { ordenante: datos.ordenante, importe: datos.importe, forma: datos.forma, concepto: datos.concepto };
+if (candidatos.length !== 1)
+  return [{ json: { ...base, decision: 'revisar', motivo: candidatos.length ? 'Hay varios encargos posibles' : 'No he encontrado ningún encargo pendiente de esa persona' } }];
+const e = candidatos[0];
+if (datos.importe > e.pendiente)
+  return [{ json: { ...base, decision: 'revisar', encargo_id: e.id, motivo: `Paga ${datos.importe} € pero al encargo #${e.id} solo le faltan ${e.pendiente} €` } }];
+return [{ json: { ...base, decision: 'registrar', encargo_id: e.id, motivo: 'Coincide con un único encargo' } }];
+```
+
+| Parte | Qué hace |
 |---|---|
-| Value 1 | `{{ $json.body.datos.estado }}` |
-| Operador | String → is equal to |
-| Value 2 | `pagado` |
-
-Ahora **dos** nodos **Send Email** (credencial `Mailpit`, mismo remitente, `To` = `{{ $json.body.datos.email }}`):
-
-- Salida **true** → `Tarta lista para recoger`
-  - Subject: `Tu encargo #{{ $json.body.datos.id }} está pagado`
-  - Text: `Hola {{ $json.body.datos.cliente }}, hemos recibido {{ $json.body.datos.importe.toFixed(2) }} € y tu encargo ya está pagado por completo. Te esperamos el {{ $json.body.datos.fecha_entrega }} para recoger tu {{ $json.body.datos.tarta }}.`
-- Salida **false** → `Recibo de pago`
-  - Subject: `Recibo de tu pago del encargo #{{ $json.body.datos.id }}`
-  - Text: `Hola {{ $json.body.datos.cliente }}, hemos recibido {{ $json.body.datos.importe.toFixed(2) }} €. Te quedan por pagar {{ $json.body.datos.pendiente.toFixed(2) }} € antes de la entrega ({{ $json.body.datos.fecha_entrega }}).`
-
-Prueba el IF con dos `curl`, uno por cada rama. Para cada uno:
-
-1. Cierra el nodo y pulsa **Execute workflow** (abajo): n8n se queda esperando un aviso, igual que antes.
-2. Pega el comando en tu terminal y pulsa Enter.
-3. Mira el lienzo: el camino que ha seguido el aviso se pone en verde, y el correo llega a Mailpit.
-
-**Rama «pagado»** (ya no debe nada: sale por *true*, «Tarta lista para recoger»):
-
-```bash
-curl -X POST http://localhost:5678/webhook-test/pasteleria \
-  -H "Content-Type: application/json" \
-  -d '{"evento":"pago.registrado","datos":{"id":99,"cliente":"Ana Prueba","email":"ana@example.com","tarta":"Tarta de queso","raciones":8,"precio":32,"pagado":32,"pendiente":0,"estado":"pagado","fecha_entrega":"2026-12-01","importe":10}}'
-```
-
-**Rama «pendiente»** (todavía debe algo: sale por *false*, «Recibo de pago»). Vuelve a pulsar **Execute workflow** antes de pegarlo:
-
-```bash
-curl -X POST http://localhost:5678/webhook-test/pasteleria \
-  -H "Content-Type: application/json" \
-  -d '{"evento":"pago.registrado","datos":{"id":99,"cliente":"Ana Prueba","email":"ana@example.com","tarta":"Tarta de queso","raciones":8,"precio":32,"pagado":10,"pendiente":22,"estado":"pendiente","fecha_entrega":"2026-12-01","importe":10}}'
-```
-
-La única diferencia entre los dos son `pagado`, `pendiente` y `estado`. El IF solo mira `estado`.
+| `norm` | Quita tildes, mayúsculas y signos para comparar `LUCIA GOMEZ` con `Lucía Gómez` |
+| `porNumero` | Si el concepto dice `encargo 2`, ese número manda sobre el nombre |
+| `candidatos` | Los encargos pendientes que podrían ser de esta persona |
+| Las dos comprobaciones finales | Solo registra si hay **exactamente un** candidato y **no se paga de más** |
 
 
-![El IF «¿Queda pagado?»: estado igual a `pagado`](imagenes/p4-07-if-pagado.jpg)
-*El IF «¿Queda pagado?»: estado igual a `pagado`*
+![El nodo Code «Buscar el encargo» (el código completo está justo encima)](imagenes/p7-07-code-buscar-encargo.jpg)
+*El nodo Code «Buscar el encargo» (el código completo está justo encima)*
 
-### 4.6 Publicar y probar con la app de verdad
+### 7.6 Registrar o preguntar
 
-1. Pulsa **Publish** (arriba a la derecha). Se abre una ventana que pide un **nombre de versión** (ya viene uno puesto): pulsa **Publish** otra vez. Después sale un aviso de «Workflow published»: pulsa **Got it**. Un flujo publicado escucha la **Production URL** sin que tengas que pulsar nada.
+Nodo **IF** `¿Se puede registrar?`: Value 1 `{{ $json.decision }}` → String → is equal to → `registrar`.
 
-   ![La ventana de Publish: deja el nombre de versión y confirma](imagenes/p4-10-publicar-dialogo.jpg)
-   *La ventana de Publish: deja el nombre de versión y confirma*
-
-   ![Aviso de flujo publicado](imagenes/p4-11-publicado.jpg)
-   *Aviso de flujo publicado*
-
-2. En la app (http://localhost:8000) pulsa **Nuevo encargo**. Pon tu nombre, un correo inventado (`tu@correo.example`), una tarta de 30 €, una fecha de entrega entre mañana y dentro de 30 días y una señal de 10 €.
-3. En la app, abre **Avisos a n8n**: el aviso nuevo dice **«Enviado. n8n respondió 200»** (antes decía 404). En Mailpit llega **«Tu encargo #9 está confirmado»**.
-4. En la ficha del encargo, **Registrar pago** de 10 €: llega el **recibo**. Registra otros 10 €: ahora faltan 10 € todavía. Registra los últimos 10 €: el encargo queda pagado y llega **«Tu encargo está pagado»**.
-5. Mira la pestaña **Executions** del flujo: cada aviso es una ejecución, con sus datos. (Las ejecuciones de un flujo publicado **no aparecen en el lienzo** al momento: se ven aquí.)
-
-   ![Las ejecuciones del flujo: la última muestra el camino que siguió el aviso](imagenes/p4-12-ejecuciones.jpg)
-   *Las ejecuciones del flujo: la última muestra el camino que siguió el aviso*
-
-   ![Mailpit con los tres correos al cliente](imagenes/p4-13-mailpit-tres-correos.jpg)
-   *Mailpit con los tres correos al cliente*
-
-   ![El correo de confirmación, con los importes que dio la app](imagenes/p4-14-correo-confirmacion.jpg)
-   *El correo de confirmación, con los importes que dio la app*
-
-   ![Avisos a n8n: el primero decía 404, los nuevos dicen «Enviado. n8n respondió 200»](imagenes/p4-15-avisos-200.jpg)
-   *Avisos a n8n: el primero decía 404, los nuevos dicen «Enviado. n8n respondió 200»*
-
-
-**Checkpoint:** tres correos distintos en Mailpit y tres ejecuciones verdes. Con este flujo, cada encargo y cada pago avisan al cliente solos.
-
-
-## Cómo está hecha la app (por si tienes curiosidad)
-
-No tienes que tocarla, pero conviene entenderla porque **n8n va a hablar con ella**. Sigue el patrón **MVC**, que separa tres responsabilidades. Piensa en un restaurante:
-
-| Pieza | Carpeta | En el restaurante | Qué hace |
-|---|---|---|---|
-| **M**odelo | `backend/models/`, `backend/database.py` | La cocina | Guarda los datos y aplica las reglas (señal mínima de 10 €, entrega en 30 días...) |
-| Schemas | `backend/schemas/` | La comanda | La forma exacta de los datos que entran y salen (con Pydantic) |
-| Rutas | `backend/routes/` | El plano de la sala | Dice qué mesa (URL) atiende qué camarero (función): «los encargos nuevos los lleva `crear`» |
-| **C**ontrolador | `backend/controllers/` | El camarero | La lógica de cada petición: se la pasa a la cocina y devuelve la respuesta |
-| Middleware | `backend/middleware/` | El portero | Actúa antes o alrededor: comprueba la clave de la API y convierte los errores en respuestas claras |
-| **V**ista | `frontend/` | El comedor y la carta | Lo que ve y usa la dependienta: HTML, CSS y JavaScript |
-| `main.py` | `backend/main.py` | El encargado | Solo junta las piezas, no tiene lógica |
-
-La idea clave: **la interfaz no tiene reglas ni toca la base de datos**. Pide todo a la API, igual que lo hará n8n. Es como si la pantalla y n8n fueran dos clientes del mismo camarero:
+- Salida **true** → nodo **HTTP Request** `Registrar el pago`:
+  - Method `POST`, URL (en modo expresión) `http://pasteleria:8000/api/encargos/{{ $json.encargo_id }}/pagos`, misma autenticación.
+  - **Send Body** activado, Body Content Type `JSON`, **Specify Body** `Using JSON`, JSON: `{ "importe": {{ $json.importe }}, "forma_pago": "{{ $json.forma }}" }`
+- Salida **false** → nodo **Send Email** `Preguntar a Marisa`: To `marisa@lacuchara.example`, Subject `Pago para revisar: {{ $json.importe }} € de {{ $json.ordenante }}`, Text:
 
 ```
- Pantalla (frontend/) ─┐                 ┌─ middleware/ (clave)
-                       ├──▶ routes/ ──▶ controllers/ ──▶ models/ ──▶ base de datos
- n8n ──────────────────┘
+Hola Marisa,
+
+Ha llegado un pago y no lo he registrado.
+
+Motivo: {{ $json.motivo }}
+
+Ordenante: {{ $json.ordenante }}
+Importe: {{ $json.importe }} €
+Forma: {{ $json.forma }}
+Concepto: {{ $json.concepto }}
+
+Regístralo tú si es correcto.
 ```
 
-Por eso la carpeta se llama `frontend/` y no `templates/`: no son plantillas que rellena el servidor, es una interfaz que **consulta la API**.
+
+![El IF «¿Se puede registrar?»: `decision` igual a `registrar`](imagenes/p7-08-if-se-puede-registrar.jpg)
+*El IF «¿Se puede registrar?»: `decision` igual a `registrar`*
+
+![El nodo «Registrar el pago»: método POST y la URL con el número del encargo](imagenes/p7-09-http-registrar-pago.jpg)
+*El nodo «Registrar el pago»: método POST y la URL con el número del encargo*
+
+![El cuerpo JSON de la petición: importe y forma de pago](imagenes/p7-10-http-registrar-body.jpg)
+*El cuerpo JSON de la petición: importe y forma de pago*
+
+![El nodo «Preguntar a la dueña»](imagenes/p7-11-email-preguntar-nodo.jpg)
+*El nodo «Preguntar a la dueña»*
+
+> **Un detalle que ahorra trabajo:** al registrar el pago, la app avisa de `pago.registrado` y **el flujo 01 manda solo el recibo al cliente** (o el "ya está pagado"). No hay que enviarlo desde aquí. Los flujos se encadenan a través de la app.
+
+### 7.7 Probarlos todos
+
+Pega cada uno de los 7 correos (restableciendo los datos si repites) y comprueba la tabla de resultados esperados. Para cada caso mira:
+
+- **Mailpit:** ¿ha salido el correo a Marisa, o el recibo al cliente?
+- **La ficha del encargo** en la app: ¿ha cambiado lo pagado?
+- **Executions:** ¿por qué rama fue?
+
+Cuando funcionen, **publica** el flujo y asígnale `00 Avisar de errores` como *Error workflow*.
+
+**Checkpoint:** los 7 casos dan el resultado de la tabla. Marisa ya no apunta a mano los pagos que llegan por el banco.
 
 ---
 
