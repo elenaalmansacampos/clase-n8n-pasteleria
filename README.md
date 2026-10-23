@@ -1,16 +1,8 @@
 # Sesión 1 · Avisos al cliente y cierre de caja
 
-> Estás en la rama **`sesion-1`**. La vista general de la clase está en `main`. Al terminar, pasa a la rama `sesion-2`.
+Clase práctica para aprender, paso a paso, a automatizar un negocio pequeño con n8n: desde encender n8n con Docker hasta tener flujos reales funcionando, con un agente de IA ayudando.
 
-**Duración:** ~1 h 50 min · **Pasos 1 a 5** · **Flujos 01 y 02**
-
-**Antes de empezar:** Docker abierto, Git, y tu API key de Groq creada (ver `main`, apartado 2). Si no tienes el repositorio clonado:
-
-```bash
-git clone https://github.com/Factoria-F5-madrid/clase-n8n-pasteleria.git clase-n8n-pasteleria && cd clase-n8n-pasteleria && git switch sesion-1
-```
-
-**Qué vas a hacer:** levantar la pastelería y n8n, conectarlos y construir dos flujos: uno que **reacciona** cuando la app avisa (confirmar el encargo y mandar recibos) y otro que se **despierta solo** cada noche (el cierre de caja).
+**Duración:** dos sesiones, unas 3 h 50 min en total.
 
 ---
 
@@ -20,8 +12,7 @@ git clone https://github.com/Factoria-F5-madrid/clase-n8n-pasteleria.git clase-n
 
 ### 1.1 Comprueba que Docker funciona
 
-1. Abre **Docker Desktop** y espera a que abajo a la izquierda ponga *Engine running* (la primera vez tarda un minuto).
-2. En una terminal:
+Ya tiene una **app** (carpetas `backend/` y `frontend/`) que guarda los encargos y los pagos. Nosotros no la tocamos: construimos con n8n **todo lo que pasa alrededor**.
 
 ```bash
 docker --version
@@ -149,98 +140,14 @@ Es lo que usará n8n. Pulsa **Authorize** (arriba a la derecha) y escribe el val
 
 La pantalla que acabas de usar **también pide sus datos a esta API**: es un cliente más, igual que lo será n8n. Por eso, en el repositorio, la interfaz está en `frontend/` y la lógica en `backend/` (en el README de `main` tienes el esquema).
 
-![El botón Authorize, arriba a la derecha](imagenes/p2-09-swagger-authorize-boton.jpg)
-*El botón Authorize, arriba a la derecha*
+### Los cuatro flujos que vas a construir
 
-![Escribe aquí el valor de API_KEY](imagenes/p2-10-swagger-dialogo-clave.jpg)
-*Escribe aquí el valor de API_KEY*
-
-![Con la clave puesta, los candados quedan cerrados](imagenes/p2-11-swagger-autorizado.jpg)
-*Con la clave puesta, los candados quedan cerrados*
-
-![Respuesta de GET /api/encargos: código 200 y los encargos en JSON](imagenes/p2-12-swagger-respuesta.jpg)
-*Respuesta de GET /api/encargos: código 200 y los encargos en JSON*
-
-
-**El aviso a n8n.** Cada vez que se crea un encargo o se registra un pago, desde la pantalla **o** desde la API, la app envía un aviso (*webhook*) a n8n con este formato:
-
-```json
-{
-  "evento": "pago.registrado",
-  "datos": { "id": 3, "cliente": "Lucía Gómez", "email": "lucia3@example.com", "tarta": "Tarta de zanahoria",
-             "precio": 40.0, "pagado": 30.0, "pendiente": 10.0, "estado": "pendiente",
-             "fecha_entrega": "2026-10-21", "importe": 10.0 }
-}
-```
-
-Hay **dos eventos**: `encargo.creado` y `pago.registrado`. Ahora mismo nadie los escucha: eso lo arreglamos en el Paso 4.
-
-**¿Dónde veo ese aviso?** En la pantalla **Avisos a n8n** (http://localhost:8000/avisos, está en el menú de arriba). La app apunta cada aviso que envía: la hora, el evento, el JSON completo (pulsa **Ver JSON**) y si n8n lo recibió.
-
-1. Ve a **Avisos a n8n**: de momento está vacía.
-
-   ![La pantalla Avisos a n8n, todavía vacía](imagenes/p2-03-avisos-vacia.jpg)
-   *La pantalla Avisos a n8n, todavía vacía*
-
-2. Crea un encargo desde la pantalla (o registra un pago) y vuelve a **Avisos a n8n**.
-3. Aparece el aviso, con este resultado: **«n8n respondió 404 (ningún flujo publicado escucha esta dirección)»**. Es lo normal: la app llama a la puerta de n8n, pero todavía no hay ningún flujo dentro que abra. Cuando construyamos el flujo, el mismo aviso dirá **«Enviado. n8n respondió 200»**.
-
-   ![El aviso aparece con un 404: n8n está encendido, pero ningún flujo lo atiende](imagenes/p2-07-avisos-404.jpg)
-   *El aviso aparece con un 404: n8n está encendido, pero ningún flujo lo atiende*
-
-   ![Pulsa «Ver JSON» para ver exactamente lo que se envió](imagenes/p2-08-aviso-json.jpg)
-   *Pulsa «Ver JSON» para ver exactamente lo que se envió*
-
-
-| Lo que dice el resultado | Qué significa |
-|---|---|
-| `Enviado. n8n respondió 200` | n8n lo recibió y un flujo lo atendió |
-| `n8n respondió 404 …` | n8n está encendido, pero ningún flujo **publicado** escucha esa dirección |
-| `No se pudo llegar a n8n …` | n8n no responde: está apagado o la dirección del `.env` está mal |
-| `No se ha enviado: N8N_WEBHOOK_URL está vacío` | Falta la dirección en el `.env` |
-
-**Checkpoint:** has creado un encargo desde la pantalla, has visto su aviso en **Avisos a n8n** (con el 404) y has entendido que la app avisa pero no envía correos.
-
----
-
-## Paso 3 — Crear las credenciales (10 min)
-
-Las **credenciales** son las llaves que n8n guarda cifradas para usar servicios. Así **nunca escribimos una clave dentro de un nodo** (y no acaba en GitHub).
-
-En n8n: **menú lateral → Credentials → Create credential** (o *Create → Credential*). Crea estas tres:
-
-| Tipo (búscalo por este nombre) | Nombre | Qué rellenar |
+| Flujo | Qué hace | Sesión |
 |---|---|---|
-| **SMTP** | `Mailpit` | Host `mailpit` · Port `1025` (cambia el 465 que viene por defecto) · User y Password **vacíos** · **SSL/TLS desactivado** (viene activado) · deja *Disable STARTTLS* como está |
-| **Header Auth** | `API Pastelería` | Name `X-API-Key` · Value: tu `API_KEY` del `.env` |
-| **Groq** | `Groq` | Tu API key de Groq |
-
-**Cómo se crea una credencial** (ejemplo con la de SMTP; las otras dos son igual de cortas):
-
-![Credentials, todavía sin ninguna: pulsa Add first credential](imagenes/p3-01-credenciales-vacio.jpg)
-*Credentials, todavía sin ninguna: pulsa Add first credential*
-
-![Escribe SMTP en el buscador y elígelo](imagenes/p3-02-credencial-buscar-smtp.jpg)
-*Escribe SMTP en el buscador y elígelo*
-
-![El formulario trae el puerto 465 y SSL activado: hay que cambiarlos](imagenes/p3-03-smtp-por-defecto.jpg)
-*El formulario trae el puerto 465 y SSL activado: hay que cambiarlos*
-
-![Resultado: Host `mailpit`, Port `1025`, SSL/TLS apagado. Pulsa Save](imagenes/p3-04-smtp-rellenado.jpg)
-*Resultado: Host `mailpit`, Port `1025`, SSL/TLS apagado. Pulsa Save*
-
-Para **Header Auth** pones el nombre de la cabecera (`X-API-Key`) y la clave (n8n la muestra tapada). Para **Groq**, eliges Groq y pegas tu API key.
-
-![La credencial API Pastelería: Name `X-API-Key` y Value tapado](imagenes/p3-06-credencial-header-auth.jpg)
-*La credencial API Pastelería: Name `X-API-Key` y Value tapado*
-
-> **Ojo con `localhost`:** n8n corre dentro de Docker. Para él, `localhost` es **su propio contenedor**. Para hablar con otro contenedor usa su nombre: `mailpit`, `pasteleria`. Por eso el host es `mailpit` y más adelante la app será `http://pasteleria:8000`.
-
-
-![Las tres credenciales ya creadas](imagenes/p3-05-credenciales-lista.jpg)
-*Las tres credenciales ya creadas*
-
-**Checkpoint:** las tres credenciales aparecen en la lista. (Si al guardar SMTP hay botón de *Test*, debe salir en verde.)
+| **01** Eventos de la pastelería | Cuando la app avisa, manda al cliente la confirmación del encargo y los recibos de pago | 1 |
+| **02** Cierre diario | Cada noche suma lo cobrado en el día y se lo manda a Marisa | 1 |
+| **00** Avisar de errores | Si un flujo falla, avisa a Marisa con el motivo | 2 |
+| **03** Pagos por correo | Lee los avisos del banco con IA y registra cada pago en su encargo | 2 |
 
 ---
 
@@ -248,13 +155,10 @@ Para **Header Auth** pones el nombre de la cabecera (`X-API-Key`) y la clave (n8
 
 **Objetivo:** cuando la app avise de un evento, enviar el correo adecuado al cliente.
 
-```
- Webhook ──▶ Switch ──┬── encargo.creado ───▶ Correo: "Tu encargo está confirmado"
-                      └── pago.registrado ──▶ IF ¿queda pagado? ──┬── sí ──▶ Correo: "Ya está pagado"
-                                                                  └── no ──▶ Correo: "Recibo, te quedan X €"
-```
-
-Así queda el flujo terminado (puedes volver a esta imagen para comprobar el tuyo):
+| Sesión | Rama | Pasos | Duración | Al terminar tienes funcionando |
+|---|---|---|---|---|
+| **1** | `sesion-1` | 1 a 5 | ~1 h 50 | Todo levantado y conectado, los **avisos al cliente** (flujo 01) y el **cierre de caja** (flujo 02) |
+| **2** | `sesion-2` | 6 a 9 | ~2 h | **Aviso de errores** (flujo 00), **pagos por correo con IA** (flujo 03), un flujo hecho con el agente y todo subido a tu repositorio |
 
 ![Flujo 01 completo: webhook, Switch, un IF y tres correos](imagenes/p4-01-flujo-01-lienzo.jpg)
 *Flujo 01 completo: webhook, Switch, un IF y tres correos*
@@ -286,9 +190,9 @@ Renombra el nodo a `Evento de la pastelería` (clic en el nombre o `F2`).
 Para desarrollar sin tocar la app, simulamos el aviso con `curl`. En n8n, pulsa **Listen for test event** (o *Execute step*) en el nodo Webhook y **en los siguientes 2 minutos** ejecuta en tu terminal:
 
 ```bash
-curl -X POST http://localhost:5678/webhook-test/pasteleria \
-  -H "Content-Type: application/json" \
-  -d '{"evento":"encargo.creado","datos":{"id":99,"cliente":"Ana Prueba","email":"ana@example.com","tarta":"Tarta de queso","raciones":8,"precio":32,"pagado":10,"pendiente":22,"estado":"pendiente","fecha_entrega":"2026-12-01"}}'
+git clone https://github.com/Factoria-F5-madrid/clase-n8n-pasteleria.git clase-n8n-pasteleria
+cd clase-n8n-pasteleria
+git switch sesion-1          # y en la segunda sesión: git switch sesion-2
 ```
 
 El nodo se llena con el aviso. Fíjate en la pestaña **Output**: los datos están en `body.evento` y `body.datos`. **Anota esto: el JSON que envía la app está dentro de `body`.**
@@ -436,75 +340,58 @@ La única diferencia entre los dos son `pagado`, `pendiente` y `estado`. El IF s
 
 ---
 
-## Paso 5 — Flujo 02: el cierre de caja de cada noche (30 min)
+## Cómo está hecha la app (por si tienes curiosidad)
+
+No tienes que tocarla, pero conviene entenderla porque **n8n va a hablar con ella**. Sigue el patrón **MVC**, que separa tres responsabilidades. Piensa en un restaurante:
+
+| Pieza | Carpeta | En el restaurante | Qué hace |
+|---|---|---|---|
+| **M**odelo | `backend/models/`, `backend/database.py` | La cocina | Guarda los datos y aplica las reglas (señal mínima de 10 €, entrega en 30 días...) |
+| Schemas | `backend/schemas/` | La comanda | La forma exacta de los datos que entran y salen (con Pydantic) |
+| Rutas | `backend/routes/` | El plano de la sala | Dice qué mesa (URL) atiende qué camarero (función): «los encargos nuevos los lleva `crear`» |
+| **C**ontrolador | `backend/controllers/` | El camarero | La lógica de cada petición: se la pasa a la cocina y devuelve la respuesta |
+| Middleware | `backend/middleware/` | El portero | Actúa antes o alrededor: comprueba la clave de la API y convierte los errores en respuestas claras |
+| **V**ista | `frontend/` | El comedor y la carta | Lo que ve y usa la dependienta: HTML, CSS y JavaScript |
+| `main.py` | `backend/main.py` | El encargado | Solo junta las piezas, no tiene lógica |
+
+La idea clave: **la interfaz no tiene reglas ni toca la base de datos**. Pide todo a la API, igual que lo hará n8n. Es como si la pantalla y n8n fueran dos clientes del mismo camarero:
+
+```
+ Pantalla (frontend/) ─┐                 ┌─ middleware/ (clave)
+                       ├──▶ routes/ ──▶ controllers/ ──▶ models/ ──▶ base de datos
+ n8n ──────────────────┘
+```
+
+Por eso la carpeta se llama `frontend/` y no `templates/`: no son plantillas que rellena el servidor, es una interfaz que **consulta la API**.
+
+---
+
+## Estructura de este repositorio
 
 **Objetivo:** cada noche, sumar lo cobrado en el día por forma de pago y mandárselo a Marisa. Este flujo **no lo activa un aviso de la app**, sino el **reloj**.
 
 ```
  Cada noche 21:00 ──▶ HTTP: pagos de hoy ──▶ Code: sumar por forma de pago ──▶ Correo a Marisa
 ```
-
-Así queda el flujo terminado:
-
-![Flujo 02: reloj, petición a la API, código que suma y correo](imagenes/p5-01-flujo-02-lienzo.jpg)
-*Flujo 02: reloj, petición a la API, código que suma y correo*
-
-1. Nuevo flujo: `02 Cierre diario`.
-2. **Schedule Trigger** → renómbralo `Cada noche a las 21:00`: Trigger Interval `Days`, Days Between Triggers `1`, Trigger at Hour `9pm`.
-
-   ![El Schedule Trigger: cada 1 día, a las 9pm (21:00)](imagenes/p5-02-schedule-nodo.jpg)
-   *El Schedule Trigger: cada 1 día, a las 9pm (21:00)*
-
-3. Nodo **HTTP Request** llamado `Pagos de hoy`:
-
-| Campo | Valor |
-|---|---|
-| Method | `GET` |
-| URL | `http://pasteleria:8000/api/pagos` |
-| Authentication | `Generic Credential Type` → Generic Auth Type `Header Auth` → Credential `API Pastelería` |
-| Send Query Parameters | activado |
-| Query `desde` | `{{ $now.format('yyyy-MM-dd') }}` |
-| Query `hasta` | `{{ $now.format('yyyy-MM-dd') }}` |
-
-![El nodo HTTP Request: método, URL y credencial](imagenes/p5-03-http-pagos-nodo.jpg)
-*El nodo HTTP Request: método, URL y credencial*
-
-![Los dos parámetros `desde` y `hasta`, con la fecha de hoy](imagenes/p5-04-http-query-fechas.jpg)
-*Los dos parámetros `desde` y `hasta`, con la fecha de hoy*
-
-
-   En **Settings** del nodo (pestaña con el engranaje) activa **Always Output Data**. Sin esto, si hoy no hay ningún pago, el flujo se **para en seco** y Marisa no recibe ni el correo que dice "hoy no se cobró nada".
-
-   ![Pestaña Settings del nodo: Always Output Data activado](imagenes/p5-05-http-always-output-data.jpg)
-   *Pestaña Settings del nodo: Always Output Data activado*
-
-
-4. Pulsa **Execute step**: salen los pagos de hoy (3 en los datos de ejemplo), **un item por pago**.
-5. Nodo **Code** llamado `Sumar por forma de pago`, **Mode:** `Run Once for All Items`, lenguaje JavaScript:
-
-```javascript
-const pagos = $input.all().map(i => i.json).filter(p => p.importe);
-const porForma = {};
-for (const p of pagos) porForma[p.forma_pago] = (porForma[p.forma_pago] || 0) + p.importe;
-const total = pagos.reduce((s, p) => s + p.importe, 0);
-const lineas = Object.entries(porForma).map(([forma, importe]) => `  ${forma}: ${importe.toFixed(2)} €`);
-return [{ json: {
-  fecha: $now.toFormat('dd/MM/yyyy'),
-  total: total.toFixed(2),
-  resumen: pagos.length ? lineas.join('\n') : '  (hoy no se ha cobrado nada)',
-  n: pagos.length,
-} }];
-```
-
-> **Qué hace:** junta todos los items en uno solo con el total y un resumen por forma de pago. El `.filter(p => p.importe)` descarta el item vacío que genera *Always Output Data* cuando no hay pagos.
-> **Detalle que da guerra:** en un campo de n8n (expresión) se escribe `$now.format(...)`, pero **dentro de un nodo Code** es `$now.toFormat(...)`. Es el mismo dato (un fecha de la librería Luxon) con dos formas de usarlo.
-
-![El nodo Code con el JavaScript que suma por forma de pago](imagenes/p5-06-code-sumar-nodo.jpg)
-*El nodo Code con el JavaScript que suma por forma de pago*
-
-
-6. Nodo **Send Email** `Enviar cierre a Marisa`: credencial `Mailpit`, To `marisa@lacuchara.example`, Subject `Cierre de caja del {{ $json.fecha }}`, Text:
-
+clase-n8n-pasteleria/
+├── README.md              ← esta página (vista general)
+├── docker-compose.yml     ← app + n8n + Mailpit
+├── .env.example           ← copia a .env
+├── backend/               ← la lógica de la app (no hace falta tocarla)
+│   ├── main.py            ← junta las piezas
+│   ├── models/            ← M: datos y reglas del negocio
+│   ├── schemas/           ← la forma de los datos (Pydantic)
+│   ├── routes/            ← qué URL llega a qué función
+│   ├── controllers/       ← C: la lógica de cada petición
+│   ├── middleware/        ← la clave de la API y los errores
+│   ├── services/          ← los avisos a n8n
+│   └── tests/
+├── frontend/              ← V: la interfaz (HTML, CSS y JavaScript)
+├── Dockerfile             ← construye backend + frontend en una sola imagen
+├── data/correos/          ← los 7 correos de ejemplo de la sesión 2
+├── mis-flujos/            ← aquí guardas tus exportaciones de n8n
+├── (sesion-1) referencia/ ← flujos 01 y 02 terminados
+└── (sesion-2) referencia/ ← flujos 00, 01, 02 y 03 terminados
 ```
 Hola Marisa,
 

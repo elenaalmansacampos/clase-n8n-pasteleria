@@ -1,0 +1,143 @@
+{
+  "name": "Cierre diario",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 21
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1dc128bf-b131-44a0-ae00-d18221843253",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "http://pasteleria:8000/api/pagos",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "={{ $now.format('yyyy-MM-dd') }}",
+              "value": "={{ $now.format('yyyy-MM-dd') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "237014bd-9832-490f-b1d4-8c542a027b4d",
+      "name": "HTTP Request",
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "zmER38M2rhy18iMx",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const pagos = $input.all().map(i => i.json).filter(p => p.importe);\nconst porForma = {};\nfor (const p of pagos) porForma[p.forma_pago] = (porForma[p.forma_pago] || 0) + p.importe;\nconst total = pagos.reduce((s, p) => s + p.importe, 0);\nconst lineas = Object.entries(porForma).map(([forma, importe]) => `  ${forma}: ${importe.toFixed(2)} €`);\nreturn [{ json: {\n  fecha: $now.toFormat('dd/MM/yyyy'),\n  total: total.toFixed(2),\n  resumen: pagos.length ? lineas.join('\\n') : '  (hoy no se ha cobrado nada)',\n  n: pagos.length,\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "ce6f0902-06b2-42ba-8e7f-045cb9fd3a77",
+      "name": "Sumar por forma de pago"
+    },
+    {
+      "parameters": {
+        "fromEmail": "pasteleria@lacuchara.example",
+        "toEmail": "=marisa@lacuchara.example",
+        "subject": "=Cierre de caja del {{ $json.fecha }}",
+        "emailFormat": "text",
+        "text": "=Hola Marisa,\n\nHoy se han cobrado {{ $json.total }} € ({{ $json.n }} pagos):\n\n{{ $json.resumen }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        672,
+        0
+      ],
+      "id": "1c92d993-5afa-43da-b51c-4ffed5093763",
+      "name": "Send an Email",
+      "webhookId": "63003d7d-50eb-4f59-8208-86c27a909738",
+      "credentials": {
+        "smtp": {
+          "id": "60fcTfPeXFNHApC7",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Sumar por forma de pago",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sumar por forma de pago": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6a5fcad3-c19b-42cd-b1b8-79b87da7f2b3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ba7cdcebf2b425ef8604167b6de92e5de63bb49c0715d13f14f8243073c76aed"
+  },
+  "nodeGroups": [],
+  "id": "qfbNUkA8bHjqNntw",
+  "tags": []
+}
